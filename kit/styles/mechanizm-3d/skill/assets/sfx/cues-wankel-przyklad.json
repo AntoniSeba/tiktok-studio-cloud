@@ -1,0 +1,1124 @@
+[
+ {
+  "t": 0.07,
+  "sfx": "tick",
+  "db": -17,
+  "note": "10 śrub wyskakuje po kolei"
+ },
+ {
+  "t": 0.13,
+  "sfx": "tick",
+  "db": -17,
+  "note": "10 śrub wyskakuje po kolei"
+ },
+ {
+  "t": 0.19,
+  "sfx": "tick",
+  "db": -17,
+  "note": "10 śrub wyskakuje po kolei"
+ },
+ {
+  "t": 0.25,
+  "sfx": "tick",
+  "db": -17,
+  "note": "10 śrub wyskakuje po kolei"
+ },
+ {
+  "t": 0.31,
+  "sfx": "tick",
+  "db": -17,
+  "note": "10 śrub wyskakuje po kolei"
+ },
+ {
+  "t": 0.37,
+  "sfx": "tick",
+  "db": -17,
+  "note": "10 śrub wyskakuje po kolei"
+ },
+ {
+  "t": 0.43,
+  "sfx": "tick",
+  "db": -17,
+  "note": "10 śrub wyskakuje po kolei"
+ },
+ {
+  "t": 0.49,
+  "sfx": "tick",
+  "db": -17,
+  "note": "10 śrub wyskakuje po kolei"
+ },
+ {
+  "t": 0.55,
+  "sfx": "tick",
+  "db": -17,
+  "note": "10 śrub wyskakuje po kolei"
+ },
+ {
+  "t": 0.61,
+  "sfx": "tick",
+  "db": -17,
+  "note": "10 śrub wyskakuje po kolei"
+ },
+ {
+  "t": 0.67,
+  "sfx": "metal",
+  "db": -19,
+  "note": "pokrywa zjeżdża do kamery"
+ },
+ {
+  "t": 1.3,
+  "sfx": "sweep",
+  "db": -25,
+  "note": "obudowa wirnika się odsuwa"
+ },
+ {
+  "t": 2.929,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 2.959,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 2.991,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 3.026,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 3.064,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 3.106,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 3.153,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 3.207,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 3.27,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 3.35,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 3.463,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 3.9,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 9.82,
+  "sfx": "whoosh",
+  "db": -19,
+  "note": "cięcie na widok osiowy z najazdem"
+ },
+ {
+  "t": 10.4,
+  "sfx": "pop",
+  "db": -27,
+  "note": "trójkąt się podświetla"
+ },
+ {
+  "t": 12.3,
+  "sfx": "sweep",
+  "db": -24,
+  "note": "rysuje się obrys ósemki"
+ },
+ {
+  "t": 15.2,
+  "sfx": "pop",
+  "db": -27,
+  "note": "numer komory 1"
+ },
+ {
+  "t": 15.34,
+  "sfx": "pop",
+  "db": -27,
+  "note": "numer komory 2"
+ },
+ {
+  "t": 15.48,
+  "sfx": "pop",
+  "db": -27,
+  "note": "numer komory 3"
+ },
+ {
+  "t": 16.82,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 16.841,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 16.864,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 16.888,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 16.915,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 16.944,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 16.977,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 17.015,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 17.059,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 17.115,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 17.194,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 17.5,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 23.721,
+  "sfx": "tick",
+  "db": -14,
+  "note": "licznik wału +1"
+ },
+ {
+  "t": 24.458,
+  "sfx": "tick",
+  "db": -14,
+  "note": "licznik wału +1"
+ },
+ {
+  "t": 25.3,
+  "sfx": "tick",
+  "db": -14,
+  "note": "licznik wału +1"
+ },
+ {
+  "t": 25.3,
+  "sfx": "pop",
+  "db": -23,
+  "note": "trójkąt kończy obrót: licznik 1"
+ },
+ {
+  "t": 25.74,
+  "sfx": "whoosh",
+  "db": -19,
+  "note": "cięcie na planszę Wankla"
+ },
+ {
+  "t": 27.52,
+  "sfx": "thud",
+  "db": -20,
+  "note": "pieczątka SAMOUK"
+ },
+ {
+  "t": 27.94,
+  "sfx": "thud",
+  "db": -21,
+  "note": "pieczątka BEZ DYPLOMU"
+ },
+ {
+  "t": 29.623,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 29.647,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 29.673,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 29.701,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 29.732,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 29.765,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 29.802,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 29.845,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 29.896,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 29.96,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 30.051,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 30.4,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 36.19,
+  "sfx": "spin",
+  "db": -20,
+  "note": "cały silnik się rozpędza"
+ },
+ {
+  "t": 36.19,
+  "sfx": "lock",
+  "db": -6,
+  "note": "HIT 1: obudowa unieruchomiona"
+ },
+ {
+  "t": 42.12,
+  "sfx": "rumble",
+  "db": -25,
+  "note": "dron: dramat"
+ },
+ {
+  "t": 42.229,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 42.259,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 42.291,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 42.326,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 42.364,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 42.406,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 42.453,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 42.507,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 42.57,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 42.65,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 42.763,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 43.2,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 44.3,
+  "sfx": "scrape",
+  "db": -29.345454545454565,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 44.606,
+  "sfx": "scrape",
+  "db": -28.168283817760656,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 44.894,
+  "sfx": "scrape",
+  "db": -27.05948732552964,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 45.194,
+  "sfx": "scrape",
+  "db": -25.904273724755907,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 45.476,
+  "sfx": "scrape",
+  "db": -24.81852749927892,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 45.752,
+  "sfx": "scrape",
+  "db": -23.755494856337936,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 46.031,
+  "sfx": "scrape",
+  "db": -22.74427684205037,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 46.306,
+  "sfx": "scrape",
+  "db": -22.243444742454457,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 46.574,
+  "sfx": "scrape",
+  "db": -21.756130566587398,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 46.836,
+  "sfx": "scrape",
+  "db": -21.28075313069506,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 47.1,
+  "sfx": "scrape",
+  "db": -20.799186880979814,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 47.364,
+  "sfx": "scrape",
+  "db": -20.31957233337818,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 47.601,
+  "sfx": "scrape",
+  "db": -19.88893793674632,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 47.851,
+  "sfx": "scrape",
+  "db": -19.433983150662485,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 48.087,
+  "sfx": "scrape",
+  "db": -19.004553093405207,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 48.322,
+  "sfx": "scrape",
+  "db": -18.578170323804777,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 48.568,
+  "sfx": "scrape",
+  "db": -18.1307837168631,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 48.808,
+  "sfx": "scrape",
+  "db": -18.0,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 49.034,
+  "sfx": "scrape",
+  "db": -18.0,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 49.26,
+  "sfx": "scrape",
+  "db": -18.0,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 49.481,
+  "sfx": "scrape",
+  "db": -18.0,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 49.713,
+  "sfx": "scrape",
+  "db": -18.0,
+  "note": "uszczelka trze o ścianę"
+ },
+ {
+  "t": 49.89,
+  "sfx": "whoosh",
+  "db": -19,
+  "note": "cięcie na długą komorę"
+ },
+ {
+  "t": 50.51,
+  "sfx": "pop",
+  "db": -27,
+  "note": "napis DŁUGA"
+ },
+ {
+  "t": 50.92,
+  "sfx": "pop",
+  "db": -27,
+  "note": "napis I PŁASKA"
+ },
+ {
+  "t": 58.82,
+  "sfx": "whoosh",
+  "db": -19,
+  "note": "plansza NSU Ro 80"
+ },
+ {
+  "t": 58.92,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 58.941,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 58.964,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 58.988,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 59.015,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 59.044,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 59.077,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 59.115,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 59.159,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 59.215,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 59.294,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 59.6,
+  "sfx": "tick",
+  "db": -24,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 60.87,
+  "sfx": "thud",
+  "db": -19,
+  "note": "pieczątka SAMOCHÓD ROKU"
+ },
+ {
+  "t": 65.77,
+  "sfx": "whoosh",
+  "db": -21,
+  "note": "NSU przechodzi do Volkswagena"
+ },
+ {
+  "t": 67.5,
+  "sfx": "whoosh",
+  "db": -19,
+  "note": "cięcie na silnik: A Mazda?"
+ },
+ {
+  "t": 69.805,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 69.815,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 69.826,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 69.836,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 69.847,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 69.859,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 69.87,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 69.883,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 69.895,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 69.909,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 69.923,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 69.937,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 69.953,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 69.969,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 69.987,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 70.005,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 70.025,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 70.048,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 70.072,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 70.1,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 70.132,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 70.171,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 70.223,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 70.308,
+  "sfx": "tick",
+  "db": -27,
+  "note": "licznik lat 1967 do 1991"
+ },
+ {
+  "t": 72.2,
+  "sfx": "impact",
+  "db": -20,
+  "note": "HIT 2: pieczątka JEDYNA BEZ TŁOKA"
+ },
+ {
+  "t": 73.01,
+  "sfx": "pop",
+  "db": -26,
+  "note": "karta: genialny czy głupi"
+ },
+ {
+  "t": 73.773,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 73.847,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 73.924,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 74.004,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 74.087,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 74.173,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 74.262,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 74.355,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 74.452,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 74.554,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 74.661,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 74.775,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 74.895,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 75.024,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 75.163,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 75.314,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 75.48,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 75.666,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 75.878,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 76.13,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 76.446,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 76.896,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 78.12,
+  "sfx": "pop",
+  "db": -27,
+  "note": "pudełko PRĄDNICA"
+ },
+ {
+  "t": 78.42,
+  "sfx": "pop",
+  "db": -27,
+  "note": "pudełko BATERIA"
+ },
+ {
+  "t": 78.63,
+  "sfx": "tick",
+  "db": -22,
+  "note": "bęben: słowo przejeżdża przez okienko"
+ },
+ {
+  "t": 78.63,
+  "sfx": "riser",
+  "db": -18,
+  "note": "jedyny riser: ostatnia seria bębna"
+ },
+ {
+  "t": 78.63,
+  "sfx": "ding",
+  "db": -13,
+  "note": "bęben staje: PRĄDNICA"
+ },
+ {
+  "t": 79.76,
+  "sfx": "sweep",
+  "db": -25,
+  "note": "pasek obrotów się rozciąga"
+ },
+ {
+  "t": 84.6,
+  "sfx": "metal",
+  "db": -20,
+  "note": "obudowa i wirnik wracają"
+ },
+ {
+  "t": 85.23,
+  "sfx": "tick",
+  "db": -22,
+  "note": "10 śrub wkręca się po kolei"
+ },
+ {
+  "t": 85.31,
+  "sfx": "tick",
+  "db": -22,
+  "note": "10 śrub wkręca się po kolei"
+ },
+ {
+  "t": 85.39,
+  "sfx": "tick",
+  "db": -22,
+  "note": "10 śrub wkręca się po kolei"
+ },
+ {
+  "t": 85.47,
+  "sfx": "tick",
+  "db": -22,
+  "note": "10 śrub wkręca się po kolei"
+ },
+ {
+  "t": 85.5,
+  "sfx": "metal",
+  "db": -23,
+  "note": "pokrywa wraca"
+ },
+ {
+  "t": 85.55,
+  "sfx": "tick",
+  "db": -22,
+  "note": "10 śrub wkręca się po kolei"
+ },
+ {
+  "t": 85.63,
+  "sfx": "tick",
+  "db": -22,
+  "note": "10 śrub wkręca się po kolei"
+ },
+ {
+  "t": 85.71,
+  "sfx": "tick",
+  "db": -22,
+  "note": "10 śrub wkręca się po kolei"
+ },
+ {
+  "t": 85.79,
+  "sfx": "tick",
+  "db": -22,
+  "note": "10 śrub wkręca się po kolei"
+ },
+ {
+  "t": 85.87,
+  "sfx": "tick",
+  "db": -22,
+  "note": "10 śrub wkręca się po kolei"
+ },
+ {
+  "t": 85.95,
+  "sfx": "tick",
+  "db": -22,
+  "note": "10 śrub wkręca się po kolei"
+ },
+ {
+  "t": 86.9,
+  "sfx": "whoosh",
+  "db": -19,
+  "note": "plansza prawa jazdy"
+ },
+ {
+  "t": 87.22,
+  "sfx": "pop",
+  "db": -26,
+  "note": "naklejka następny silnik"
+ },
+ {
+  "t": 89.66,
+  "sfx": "hammer",
+  "db": -7,
+  "note": "HIT 3: pieczątka BRAK"
+ },
+ {
+  "t": 89.66,
+  "sfx": "thud",
+  "db": -12,
+  "note": "dół pod pieczątkę BRAK"
+ }
+]

@@ -1,0 +1,257 @@
+{
+  "_info": "Style wizualne generatora. Każdy styl to skill HyperFrames pobrany od autora (folder skill/). Podglądy: public/styles/<id>/. Styl csk-* to jeden z 18 stylów pakietu studio-18 (spolszczony).",
+  "styles": [
+    {
+      "id": "zabawki-3d",
+      "group": "Gatunki",
+      "name": "Postacie 3D jak zabawki",
+      "tagline": "Okrągła postać 3D z winylu odgrywa temat: miękkie światło, cień, squash and stretch.",
+      "best_for": "historyjki, \"co by było gdyby\", maskotka marki, tematy dla młodszych",
+      "read": [
+        "skill/SKILL.md"
+      ],
+      "engine": "Three.js w HyperFrames",
+      "credit": {
+        "author": "PHANTOMTONYT",
+        "repo": "https://github.com/PHANTOMTONYT/motion-design-skills",
+        "license": "MIT"
+      }
+    },
+    {
+      "id": "bajka",
+      "group": "Gatunki",
+      "name": "Bajka rysowana",
+      "tagline": "Drżące tuszowe kontury, faktura papieru i kredki, proste postacie z dużą mimiką.",
+      "best_for": "opowieści, lekcje życiowe, historia, ciepłe tematy",
+      "read": [
+        "skill/SKILL.md"
+      ],
+      "engine": "SVG + GSAP",
+      "credit": {
+        "author": "PHANTOMTONYT",
+        "repo": "https://github.com/PHANTOMTONYT/motion-design-skills",
+        "license": "MIT"
+      }
+    },
+    {
+      "id": "kinetyczna",
+      "group": "Gatunki",
+      "name": "Kinetyczna typografia",
+      "tagline": "Wielkie słowa są obrazem: uderzają, rozciągają się i podmieniają w rytm lektora.",
+      "best_for": "hooki, mocne tezy, listy, motywacja, krótkie TikToki bez grafik",
+      "read": [
+        "skill/SKILL.md"
+      ],
+      "engine": "GSAP",
+      "credit": {
+        "author": "PHANTOMTONYT",
+        "repo": "https://github.com/PHANTOMTONYT/motion-design-skills",
+        "license": "MIT"
+      }
+    },
+    {
+      "id": "wykresy",
+      "group": "Gatunki",
+      "name": "Historia w wykresach",
+      "tagline": "Wykres niesie argument: linie rysują się w czasie, słupki rosną, licznik tyka, osie się przeskalowują.",
+      "best_for": "dane, ceny, statystyki, \"jak to się zmieniło\"",
+      "read": [
+        "skill/SKILL.md"
+      ],
+      "engine": "SVG + GSAP",
+      "credit": {
+        "author": "PHANTOMTONYT",
+        "repo": "https://github.com/PHANTOMTONYT/motion-design-skills",
+        "license": "MIT"
+      }
+    },
+    {
+      "id": "diagram",
+      "group": "Gatunki",
+      "name": "Diagram: jak to działa",
+      "tagline": "Schemat buduje się element po elemencie, strzałki się rysują, po krawędziach płyną paczki danych.",
+      "best_for": "procesy, mechanizmy, \"co się dzieje, gdy...\", technologia",
+      "read": [
+        "skill/SKILL.md"
+      ],
+      "engine": "SVG + GSAP",
+      "credit": {
+        "author": "PHANTOMTONYT",
+        "repo": "https://github.com/PHANTOMTONYT/motion-design-skills",
+        "license": "MIT"
+      }
+    },
+    {
+      "id": "kolaz-vox",
+      "group": "Gatunki",
+      "name": "Kolaż w stylu Vox",
+      "tagline": "Wycinanki, raster, podarty papier, zdjęcia archiwalne i mocna typografia jak w dokumentach Vox.",
+      "best_for": "historia rzeczy, \"dlaczego X jest wszędzie\", reportaż, ciekawostki",
+      "read": [
+        "skill/SKILL.md",
+        "collage-info/SKILL.md"
+      ],
+      "engine": "HyperFrames + zdjęcia",
+      "credit": {
+        "author": "HeyGen (społeczność HyperFrames) i pyang5166",
+        "repo": "https://github.com/heygen-com/hyperframes-community-skills",
+        "license": "Apache-2.0 / MIT"
+      }
+    },
+    {
+      "id": "mechanizm-3d",
+      "group": "Gatunki",
+      "name": "Mechanizm 3D",
+      "tagline": "Model 3D budowany przez agenta w Three.js: rozstrzelenia, przekroje, praca części krok po kroku.",
+      "best_for": "silniki, maszyny, urządzenia, \"jak to jest zbudowane\"",
+      "read": [
+        "skill/SKILL.md",
+        "skill/reference/03-komponenty-wizualne.md",
+        "skill/reference/05-modele-3d.md"
+      ],
+      "engine": "Three.js w HyperFrames",
+      "credit": {
+        "author": "Antoni Seba (kanał o silnikach)",
+        "repo": "",
+        "license": "własny"
+      }
+    },
+    {
+      "id": "komiks",
+      "group": "Gatunki",
+      "name": "Komiks i szklana prezentacja",
+      "tagline": "Dwa sprawdzone style w rytm muzyki: komiks w duchu Spider-Verse albo szklane karty jak na premierze.",
+      "best_for": "premiery, nowości, energiczne explainery",
+      "read": [
+        "skill/SKILL.md"
+      ],
+      "engine": "GSAP",
+      "credit": {
+        "author": "bestagentkits",
+        "repo": "https://github.com/bestagentkits/motion-video-skill",
+        "license": "MIT"
+      }
+    },
+    {
+      "id": "motion-premium",
+      "group": "Gatunki",
+      "name": "Motion design premium",
+      "tagline": "Reżyseria jak u seniora motion designu: jeden pomysł wizualny z marki, ruch w rytmie mowy, bez \"AI slopu\".",
+      "best_for": "reklamy, produkty, marki, launch",
+      "read": [
+        "skill/SKILL.md",
+        "skill/references/judgment.md"
+      ],
+      "engine": "GSAP",
+      "credit": {
+        "author": "Tejashmakwana",
+        "repo": "https://github.com/Tejashmakwana/motionmaxxing",
+        "license": "Apache-2.0"
+      }
+    }
+  ],
+  "csk": {
+    "group": "Pakiet 18 stylów",
+    "read": [
+      "skill/SKILL.md",
+      "skill/REFERENCE.md"
+    ],
+    "credit": {
+      "author": "threeaus (Creator Style Kit)",
+      "repo": "https://github.com/threeaus/creator-style-kit",
+      "license": "MIT"
+    },
+    "styles": {
+      "dark-keynote": {
+        "name": "Ciemna premiera",
+        "tagline": "Prawie czarna scena, cienka siatka, jeden mocny kolor. Cicho, precyzyjnie, drogo.",
+        "best_for": "otwarcie, produkt, puenta"
+      },
+      "swiss-grid": {
+        "name": "Szwajcarska siatka",
+        "tagline": "Papier, czarny tekst, jeden sygnałowy czerwony. Siatka i ruch na bit.",
+        "best_for": "mechanizmy, porównania, procesy"
+      },
+      "editorial-paper": {
+        "name": "Gazeta",
+        "tagline": "Beżowy papier, gruby szeryf, żółty zakreślacz i odręczne dopiski.",
+        "best_for": "historie, \"dlaczego tak jest\""
+      },
+      "warm-notebook": {
+        "name": "Ciepły notes",
+        "tagline": "Kremowy notes, pismo odręczne, zaokrąglone naklejki. Przyjaźnie, nie dziecinnie.",
+        "best_for": "poradniki dla początkujących"
+      },
+      "poster-kinetic": {
+        "name": "Plakat w ruchu",
+        "tagline": "Każde cięcie zmienia tło, olbrzymie przycięte litery, ukośna taśma.",
+        "best_for": "pierwsze 3 sekundy, rozdziały, cytaty"
+      },
+      "dev-console": {
+        "name": "Terminal",
+        "tagline": "Ciemny terminal, maszynopis, dekodowanie znaków, zaznaczenia.",
+        "best_for": "AI, kod, narzędzia"
+      },
+      "data-journal": {
+        "name": "Dziennikarstwo danych",
+        "tagline": "Łososiowy papier jak w FT, szeryfowe tytuły, opisane słupki ze źródłem.",
+        "best_for": "wyniki, ceny, porównania danych"
+      },
+      "paper-figure": {
+        "name": "Wykres naukowy",
+        "tagline": "Biała kartka, szeryf jak w LaTeX, \"Rys. 1\" i wykresy jak z publikacji.",
+        "best_for": "nauka, badania, definicje"
+      },
+      "manim-morph": {
+        "name": "Animacja matematyczna",
+        "tagline": "Czarne tło i pisane kreską wzory jak u 3Blue1Brown.",
+        "best_for": "matematyka, fizyka, zasady działania"
+      },
+      "blueprint": {
+        "name": "Plan techniczny",
+        "tagline": "Pruski niebieski, białe linie kreślarskie, wymiary i tabliczka rysunkowa.",
+        "best_for": "architektura, mechanizmy, konstrukcje"
+      },
+      "benchmark-hud": {
+        "name": "Wskaźniki HUD",
+        "tagline": "Cyjanowa scena, ramki HUD, skanowanie i zegar 270 stopni.",
+        "best_for": "pomiary, wyniki, prędkość"
+      },
+      "particle-field": {
+        "name": "Mgławica cząstek",
+        "tagline": "Głęboki kosmos, unoszący się pył, tekst zbiera się z punktów światła.",
+        "best_for": "otwarcie, abstrakcyjne idee, skala"
+      },
+      "frosted-aurora": {
+        "name": "Szkło i zorza",
+        "tagline": "Płynąca zorza, matowe szklane karty, gradient przez słowo kluczowe.",
+        "best_for": "premiery, nowości, produkt"
+      },
+      "isometric-stack": {
+        "name": "Warstwy izometryczne",
+        "tagline": "Siatka izometryczna i spadające warstwy, które układają się w stos.",
+        "best_for": "warstwy, budowa systemu, skład"
+      },
+      "bauhaus-geometry": {
+        "name": "Bauhaus",
+        "tagline": "Złamana biel i trzy kolory podstawowe, koło, kwadrat, trójkąt jako numeracja.",
+        "best_for": "podziały, frameworki, \"3 elementy\""
+      },
+      "ink-wash": {
+        "name": "Tusz i pustka",
+        "tagline": "Papier ryżowy, pięć odcieni tuszu, czerwona pieczęć i dużo pustki.",
+        "best_for": "historia, kultura, refleksja"
+      },
+      "clay-serif": {
+        "name": "Gliniany szeryf",
+        "tagline": "Kość słoniowa, glina, ciepły szeryf, powolne wejścia. Jak spokojna książka.",
+        "best_for": "przemyślenia, eseje, podsumowania"
+      },
+      "instrument-panel": {
+        "name": "Panel przyrządów",
+        "tagline": "Aluminiowy panel, wyświetlacz LCD, fizyczne przyciski i pomarańczowa kontrolka.",
+        "best_for": "parametry, specyfikacje, konfiguracja"
+      }
+    }
+  }
+}

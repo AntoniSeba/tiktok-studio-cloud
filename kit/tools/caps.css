@@ -1,0 +1,3 @@
+      #cap { position: absolute; left: 40px; width: 1000px; font-size: 94px; font-weight: 900; z-index: 6; text-align: center; opacity: 0; line-height: 1.12; text-transform: uppercase; }
+      #cap .cw { display: inline-block; font-size: 94px; font-weight: 900; letter-spacing: -0.01em; color: #fff; -webkit-text-stroke: 18px #000; paint-order: stroke fill; text-shadow: 0 10px 30px rgba(0,0,0,.45); }
+      #cap .cw.r { color: #ff2a2a; }

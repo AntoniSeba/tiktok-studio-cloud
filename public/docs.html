@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Integracje i API: TikTok Studio</title>
+<meta name="description" content="Jak podłączyć generator wideo, eksport z TikTok Studio i maile Brevo do TikTok Studio. Pełna lista endpointów API.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Public+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+</head>
+<body>
+<header class="top" id="top"><div class="wrap"><a class="logo" href="/"><i aria-hidden="true"></i>TikTok Studio</a>
+  <nav aria-label="Główna"><a href="/logowanie">Zaloguj się</a><a class="btn" href="/rejestracja">Załóż konto</a></nav></div></header>
+<main class="wrap doc">
+  <aside aria-label="Spis treści">
+    <a href="#start">Jak to działa</a><a href="#klucz">Klucz API</a><a href="#generator">Generator wideo</a><a href="#csv">Eksport z TikTok Studio</a>
+    <a href="#ai">Asystent AI</a><a href="#maile">Maile Brevo</a><a href="#endpointy">Lista endpointów</a><a href="#bledy">Błędy</a>
+  </aside>
+  <article>
+    <h1>Integracje i API</h1>
+    <p>Studio przyjmuje dane z czterech źródeł: z Twoich rąk w aplikacji, z generatora wideo przez API, z pliku CSV wyeksportowanego z TikTok Studio i z dowolnego tekstu, który ułoży asystent AI. Ta strona prowadzi przez każde z nich.</p>
+
+    <h2 id="start">Jak to działa</h2>
+    <ol>
+      <li>Zakładasz konto. Dostajesz własne studio: kanały, filmy, kalendarz, kolejkę i ustawienia raportów. Nikt inny ich nie widzi.</li>
+      <li>Film to jeden rekord: tytuł, hook, opcjonalne cechy (temat, styl, głos, tempo, CTA), link i wyniki.</li>
+      <li>Termin publikacji to wpis w kalendarzu. Godziny podajesz w strefie czasowej konta, Studio przechowuje je w UTC.</li>
+      <li>Raz na dobę (o wybranej godzinie) Studio wysyła plan dnia, w godzinie publikacji przypomnienie, raz w tygodniu raport.</li>
+      <li>Analiza liczy wynik każdego filmu i porównuje warianty cech, żeby wskazać, co powtarzać.</li>
+    </ol>
+
+    <h2 id="klucz">Klucz API</h2>
+    <p>W aplikacji wejdź w <b>Integracje</b> i kliknij <b>Wygeneruj klucz API</b>. Klucz zaczyna się od <code>tss_</code> i jest pokazywany tylko raz. Wysyłasz go w nagłówku:</p>
+    <pre class="code">Authorization: Bearer tss_twoj_klucz</pre>
+    <p>Wygenerowanie nowego klucza unieważnia poprzedni. Klucz daje dostęp do danych studia (filmy, terminy, kolejka, analiza), ale nie do hasła ani usuwania konta.</p>
+
+    <h2 id="generator">Generator wideo</h2>
+    <p>Jeśli masz skrypt albo agenta, który renderuje filmy (HyperFrames, Remotion, CapCut API, własny pipeline), na końcu renderu wyślij jedno zapytanie:</p>
+    <pre class="code"><code>curl -X POST https://studio.soft-synergy.com/api/videos \
+  -H "Authorization: Bearer tss_twoj_klucz" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ref": "v64-skarpetki-w-lodowce",
+    "title": "Skarpetki w lodówce",
+    "hook": "Włóż skarpetki do lodówki przed egzaminem.",
+    "topic": "triki przed egzaminem",
+    "visual": "b-roll z napisami",
+    "voice": "lektor AI",
+    "file_url": "https://cdn.example.com/v64.mp4",
+    "duration_sec": 41,
+    "schedule_date": "2026-10-27",
+    "schedule_time": "18:00"
+  }'</code></pre>
+    <h3>Pola filmu</h3>
+    <table><thead><tr><th>Pole</th><th>Opis</th></tr></thead><tbody>
+      <tr><td><code>ref</code></td><td>Stały identyfikator z Twojego systemu. Ponowne wysłanie z tym samym <code>ref</code> aktualizuje film zamiast tworzyć duplikat. Bez <code>ref</code> tworzymy go z tytułu.</td></tr>
+      <tr><td><code>title</code></td><td>Wymagane przy tworzeniu. Tytuł filmu.</td></tr>
+      <tr><td><code>hook</code>, <code>topic</code>, <code>visual</code>, <code>voice</code>, <code>pace</code>, <code>cta</code>, <code>category</code></td><td>Cechy porównywane w analizie. Krótkie etykiety działają najlepiej (np. <code>"pace": "szybkie"</code>).</td></tr>
+      <tr><td><code>caption</code>, <code>pin</code></td><td>Opis do publikacji i przypięty komentarz.</td></tr>
+      <tr><td><code>url</code></td><td>Link do opublikowanego TikToka (http/https).</td></tr>
+      <tr><td><code>file_url</code></td><td>Gdzie leży plik wideo: link albo ścieżka. Studio nie przechowuje plików wideo.</td></tr>
+      <tr><td><code>duration_sec</code></td><td>Długość w sekundach, poprawia ocenę retencji.</td></tr>
+      <tr><td><code>channel</code> lub <code>channel_id</code></td><td>Kanał: id albo nazwa na TikToku (np. <code>"@nauka.na.luzie"</code>). Domyślnie pierwszy kanał.</td></tr>
+      <tr><td><code>schedule_date</code> + <code>schedule_time</code></td><td>Termin publikacji w strefie czasowej konta. Albo <code>schedule_at</code> jako pełna data ISO 8601.</td></tr>
+      <tr><td><code>stats</code></td><td>Obiekt wyników: <code>views</code>, <code>avg_watch</code> (s), <code>completion</code> (%), <code>likes</code>, <code>comments</code>, <code>shares</code>, <code>saves</code>, <code>followers</code>, <code>publish_date</code>, <code>notes</code>.</td></tr>
+      <tr><td><code>queue_id</code></td><td>Id tematu z kolejki. Temat zostanie oznaczony jako gotowy i powiązany z filmem.</td></tr>
+    </tbody></table>
+    <div class="note">Zgodność wsteczna: Studio przyjmuje też pola z lokalnego TikTok Studio: <code>id</code> (jako ref), <code>name</code>, <code>temat</code>, <code>wizual</code>, <code>glos</code>, <code>tempo</code>, <code>cat</code>, <code>path</code>. Istniejący generator nie wymaga przeróbek, tylko innego adresu i klucza.</div>
+    <h3>Odpowiedź</h3>
+    <pre class="code"><code>{ "ok": true, "created": true, "video": { "id": 12, "ref": "v64-skarpetki-w-lodowce", "next_slot": "2026-10-27T17:00:00.000Z", ... } }</code></pre>
+
+    <h2 id="csv">Eksport z TikTok Studio</h2>
+    <ol>
+      <li>Na komputerze otwórz TikTok Studio, wejdź w <b>Analityka</b>, zakładka <b>Treści</b>, i pobierz dane (CSV albo XLSX zapisany jako CSV).</li>
+      <li>W aplikacji: <b>Integracje</b>, <b>Wybierz plik CSV</b>.</li>
+      <li>Zobaczysz podgląd: liczba filmów i rozpoznane kolumny. Kliknij <b>Importuj</b>.</li>
+    </ol>
+    <p>Rozpoznajemy kolumny po polsku i po angielsku: tytuł lub opis, link, data publikacji, wyświetlenia, polubienia, komentarze, udostępnienia, zapisy, średni czas oglądania, obejrzane do końca, nowi obserwujący. Separator (przecinek, średnik, tabulator) wykrywamy sami. Wartości typu <code>12,5 tys.</code> albo <code>1.2K</code> zamieniamy na liczby. Filmy o tym samym tytule są aktualizowane, nie dublowane.</p>
+    <p>Przez API: <code>POST /api/setup/csv</code> z polem <code>csv</code> zwraca podgląd, a <code>POST /api/setup/apply</code> zapisuje.</p>
+
+    <h2 id="ai">Asystent AI (wklej cokolwiek)</h2>
+    <p>Na ekranie startowym albo w Integracjach wybierz <b>Wklej, co masz</b>. Asystent rozpoznaje kanał, filmy (z wynikami), pomysły do kolejki i terminy. Zanim cokolwiek zapiszemy, widzisz podgląd i możesz poprawić tytuły, odznaczyć zbędne pozycje albo wrócić do tekstu.</p>
+    <p>Pod spodem działa OpenRouter. Domyślny model jest tani i szybki; inny wybierzesz w <b>Ustawieniach</b> albo w polu "Model AI" na ekranie asystenta. Asystent nie wymyśla liczb ani dat: brak danych zostaje pusty.</p>
+
+    <h2 id="maile">Maile przez Brevo</h2>
+    <p>Na serwerze maile wysyła Brevo SMTP. Jako użytkownik ustawiasz tylko adres, godzinę planu dnia, dzień raportu i przypomnienia (Ustawienia). Testowy mail wyślesz z zakładki Integracje.</p>
+    <p>Dla administratora instancji: w pliku <code>.env</code> ustaw <code>BREVO_SMTP_USER</code>, <code>BREVO_SMTP_KEY</code> i <code>MAIL_FROM</code> (adres z domeny zweryfikowanej w Brevo). Bez nich Studio działa w trybie testowym i tylko zapisuje maile w logu.</p>
+
+    <h2 id="endpointy">Lista endpointów</h2>
+    <p>Wszystkie odpowiedzi to JSON z polem <code>ok</code>. Daty: <code>scheduled_at</code> w UTC (ISO 8601); przy zapisie możesz podać <code>date</code> i <code>time</code> w strefie konta.</p>
+    <table><thead><tr><th>Metoda i ścieżka</th><th>Co robi</th></tr></thead><tbody>
+      <tr><td><code>GET /api/me</code></td><td>Konto, ustawienia, kanały, postęp konfiguracji.</td></tr>
+      <tr><td><code>GET /api/videos</code></td><td>Filmy z wynikami i najbliższym terminem. Filtr <code>?channel=</code>.</td></tr>
+      <tr><td><code>POST /api/videos</code></td><td>Dodaj film albo zaktualizuj po <code>ref</code>.</td></tr>
+      <tr><td><code>PUT /api/videos/:id</code></td><td>Zmień pola filmu.</td></tr>
+      <tr><td><code>PUT /api/videos/:id/stats</code></td><td>Zapisz wyniki. Wpisanie wyników oznacza film jako opublikowany.</td></tr>
+      <tr><td><code>DELETE /api/videos/:id</code></td><td>Usuń film z terminami i wynikami.</td></tr>
+      <tr><td><code>GET /api/schedule</code></td><td>Wszystkie terminy publikacji.</td></tr>
+      <tr><td><code>POST /api/schedule</code></td><td><code>video_id</code> + <code>date</code>/<code>time</code> albo <code>scheduled_at</code>. Film ma jeden aktywny termin: ponowne planowanie go przesuwa.</td></tr>
+      <tr><td><code>PUT /api/schedule/:id</code></td><td>Zmień termin, opis albo <code>status</code>: planned, posted, skipped.</td></tr>
+      <tr><td><code>DELETE /api/schedule/:id</code></td><td>Usuń termin.</td></tr>
+      <tr><td><code>GET/POST /api/queue</code>, <code>PUT/DELETE /api/queue/:id</code></td><td>Kolejka tematów. Etapy: idea, script, render, qa, done.</td></tr>
+      <tr><td><code>POST /api/queue/:id/to-video</code></td><td>Zamień temat w film, opcjonalnie z terminem.</td></tr>
+      <tr><td><code>GET /api/analysis</code></td><td>Ranking filmów, porównanie cech i rekomendacje.</td></tr>
+      <tr><td><code>GET/POST /api/channels</code>, <code>PUT/DELETE /api/channels/:id</code></td><td>Kanały w studiu.</td></tr>
+      <tr><td><code>POST /api/setup/csv</code>, <code>POST /api/setup/apply</code></td><td>Import CSV: podgląd i zapis.</td></tr>
+      <tr><td><code>GET /api/health</code></td><td>Stan serwera (bez logowania).</td></tr>
+    </tbody></table>
+
+    <h2 id="bledy">Błędy</h2>
+    <table><thead><tr><th>Kod</th><th>Znaczenie</th></tr></thead><tbody>
+      <tr><td>400</td><td>Brakuje pola albo ma zły format. Pole <code>error</code> mówi, co poprawić.</td></tr>
+      <tr><td>401</td><td>Brak albo nieważny klucz API.</td></tr>
+      <tr><td>404</td><td>Rekord nie istnieje w Twoim studiu.</td></tr>
+      <tr><td>429</td><td>Za dużo zapytań. Odczekaj liczbę sekund z nagłówka <code>Retry-After</code>.</td></tr>
+    </tbody></table>
+    <p style="margin-top:40px"><a class="btn" href="/rejestracja">Załóż konto i wygeneruj klucz</a></p>
+  </article>
+</main>
+<footer><div class="wrap"><span>TikTok Studio to realizacja <a href="https://soft-synergy.com">Soft Synergy</a>.</span><span><a href="/">Strona główna</a></span></div></footer>
+<script src="/assets/site.js"></script>
+</body>
+</html>

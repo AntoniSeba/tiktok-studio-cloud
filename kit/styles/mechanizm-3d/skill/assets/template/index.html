@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8">
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      :root {
+        --fg: #eef2f7; --fg-2: #b6c1cf; --oil: #f5aa3c; --heat: #e2492b; --hot: #ff6a4d; --ok: #86dba1; --ice: #7cc4ff;
+        --hair: rgba(150, 165, 182, 0.3); --sans: Oswald, sans-serif; --mono: "IBM Plex Mono", monospace;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { margin: 0; overflow: hidden; background: #0a0c10; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #0a0c10; font-family: var(--sans); color: var(--fg); }
+      #gl { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; display: block; z-index: 1; }
+      #svg { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; z-index: 4; pointer-events: none; }
+      #ui { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+      .shade-top { position: absolute; left: 0; right: 0; top: 0; height: 600px; background: linear-gradient(to bottom, rgba(6,8,11,0.92) 0%, rgba(6,8,11,0.7) 50%, rgba(6,8,11,0) 100%); }
+      .shade-bot { position: absolute; left: 0; right: 0; bottom: 0; height: 820px; background: linear-gradient(to top, rgba(6,8,11,0.94) 0%, rgba(6,8,11,0.78) 48%, rgba(6,8,11,0) 100%); }
+      .kick { font-family: var(--mono); font-size: 23px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--oil); display: flex; align-items: center; gap: 18px; white-space: nowrap; }
+      .kick::after { content: ""; flex: 1; height: 1px; background: linear-gradient(to right, rgba(245,170,60,0.5), transparent); }
+
+      /* hook */
+      #hk { position: absolute; inset: 0; }
+      #hkK { position: absolute; top: 250px; left: 70px; right: 470px; }
+
+      /* górny blok */
+      #top { position: absolute; top: 262px; left: 70px; right: 70px; }
+      #topH { margin-top: 16px; font-size: 76px; font-weight: 600; line-height: 1.02; text-transform: uppercase; text-shadow: 0 6px 34px rgba(4,6,9,0.9); }
+      #topH em { font-style: normal; color: var(--oil); }
+      #topH .hot { color: var(--hot); }
+      #topH .ok { color: var(--ok); }
+
+      /* dolny pas */
+      .chips { position: absolute; left: 70px; width: 790px; top: 1210px; display: flex; flex-wrap: wrap; gap: 12px; }
+      .chip { font-family: var(--sans); font-size: 50px; font-weight: 600; text-transform: uppercase; padding: 4px 20px; background: rgba(9,12,17,0.92); border: 2px solid var(--hair); border-top: 3px solid var(--oil); opacity: 0; white-space: nowrap; }
+      .chip.hot { border-top-color: var(--heat); color: #ffb0a0; }
+      .chip.ok { border-color: rgba(134,219,161,0.6); color: var(--ok); }
+      #order { position: absolute; left: 70px; top: 1200px; display: flex; gap: 14px; }
+      #order span { width: 120px; height: 160px; line-height: 160px; text-align: center; font-family: var(--mono); font-weight: 600; font-size: 116px; background: rgba(9,12,17,0.92); border: 2px solid var(--hair); opacity: 0; }
+      #cnt { position: absolute; left: 70px; top: 1180px; display: flex; align-items: baseline; gap: 22px; opacity: 0; }
+      #cnt .n { font-family: var(--mono); font-weight: 600; font-size: 190px; line-height: 0.9; color: var(--oil); font-variant-numeric: tabular-nums; }
+      #cnt .l { font-family: var(--mono); font-size: 28px; letter-spacing: 0.16em; color: var(--fg); text-transform: uppercase; line-height: 1.3; }
+      #cnt .l b { display: block; font-family: var(--sans); font-size: 60px; letter-spacing: 0; color: var(--fg); }
+
+      /* podzielony ekran */
+      #split { position: absolute; left: 0; right: 0; top: 840px; height: 0; opacity: 0; }
+      #split::before { content: ""; position: absolute; left: 0; right: 0; top: -4px; height: 8px; background: #0a0c10; box-shadow: 0 1px 0 rgba(245,170,60,0.45), 0 -1px 0 rgba(245,170,60,0.45); }
+      #splitPill { position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%); font-family: var(--sans); font-size: 48px; font-weight: 600; text-transform: uppercase; white-space: nowrap; padding: 2px 28px; background: var(--oil); color: #1a1206; }
+      .pl { position: absolute; left: 70px; display: flex; align-items: baseline; gap: 16px; opacity: 0; white-space: nowrap; }
+      .pl b { font-family: var(--sans); font-weight: 600; font-size: 110px; line-height: 0.9; text-transform: uppercase; text-shadow: 0 8px 40px rgba(4,6,9,0.9); }
+      .pl .st { font-family: var(--sans); font-size: 48px; font-weight: 600; text-transform: uppercase; padding: 2px 16px; }
+      .pl .st.ok { color: #0c1a10; background: var(--ok); }
+      .pl .st.hot { color: #fff; background: var(--heat); }
+      .pl .st.oil { color: #1a1206; background: var(--oil); }
+      #pA { top: 300px; }
+      #pB { top: 872px; }
+
+      /* etykiety */
+      .tag { position: absolute; z-index: 6; font-family: var(--mono); font-size: 26px; letter-spacing: 0.1em; font-weight: 600; text-transform: uppercase; color: var(--fg); background: rgba(10,14,19,0.9); border: 1px solid var(--hair); padding: 9px 15px; white-space: nowrap; transform: translate(-50%, -50%); opacity: 0; }
+      .tag.oil { border-color: rgba(245,170,60,0.75); color: #ffd79a; }
+      .tag.hot { border-color: rgba(226,73,43,0.8); color: #ffb0a0; }
+      .tag.ok { border-color: rgba(134,219,161,0.75); color: #c6f0d2; }
+      .badge { position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: rgba(10,14,19,0.92); border: 3px solid var(--oil); font-family: var(--mono); font-weight: 600; font-size: 34px; line-height: 58px; text-align: center; color: var(--fg); opacity: 0; }
+      .stampX { position: absolute; transform: translate(-50%, -50%) rotate(-7deg); opacity: 0; font-family: var(--sans); font-size: 86px; font-weight: 600; text-transform: uppercase; white-space: nowrap; padding: 4px 30px; border: 6px solid currentColor; }
+      .stampX.ok { color: var(--ok); background: rgba(8,22,14,0.85); }
+      .stampX.hot { color: #ff5a3c; background: rgba(28,10,8,0.85); }
+      .stampX.oil { color: var(--oil); background: rgba(28,18,6,0.85); }
+      #dim text { font-family: var(--mono); font-weight: 600; letter-spacing: 0.12em; }
+      #dial text, #star text { font-family: var(--mono); }
+
+      /* plansze */
+      .pres { position: absolute; inset: 0; z-index: 7; opacity: 0; background: radial-gradient(118% 60% at 50% 44%, #161d26 0%, #0a0c10 58%, #06080b 100%); }
+      .pres .grid { position: absolute; inset: 0; background-image: linear-gradient(to right, rgba(150,165,182,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(150,165,182,0.05) 1px, transparent 1px); background-size: 90px 90px; -webkit-mask-image: radial-gradient(72% 46% at 50% 44%, #000 0%, transparent 80%); mask-image: radial-gradient(72% 46% at 50% 44%, #000 0%, transparent 80%); }
+      .grp { position: absolute; inset: 0; display: none; }
+      .pk { position: absolute; top: 262px; left: 70px; right: 70px; }
+      .ph { position: absolute; top: 300px; left: 70px; right: 60px; font-size: 80px; font-weight: 600; line-height: 1.02; text-transform: uppercase; }
+      .ph em { font-style: normal; color: var(--oil); }
+      .ph .hot { color: var(--hot); }
+      .ph .ok { color: var(--ok); }
+      .bsvg { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+      .bsvg text { font-family: var(--mono); fill: var(--fg-2); font-size: 24px; letter-spacing: 0.14em; }
+      .bsvg .sans { font-family: var(--sans); letter-spacing: 0; }
+      .rows { position: absolute; left: 70px; width: 790px; top: 480px; }
+      .rw { position: relative; height: 170px; margin-bottom: 26px; padding: 22px 0 0 30px; border-left: 4px solid rgba(245,170,60,0.55); background: linear-gradient(to right, rgba(20,26,34,0.9), rgba(20,26,34,0)); opacity: 0; }
+      .rw .nm { font-size: 72px; font-weight: 600; line-height: 1; text-transform: uppercase; white-space: nowrap; }
+      .rw .sb { margin-top: 12px; font-family: var(--mono); font-size: 30px; color: var(--fg-2); }
+      .rw .sb b { color: var(--oil); }
+      .rw .st { position: absolute; right: 14px; top: 38px; font-size: 64px; font-weight: 600; line-height: 1; color: #1a1206; background: var(--oil); padding: 8px 20px; opacity: 0; }
+      .big { position: absolute; font-family: var(--mono); font-weight: 600; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+      .lbl { position: absolute; font-family: var(--mono); font-size: 26px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--fg-2); }
+      .yr { position: absolute; left: 66px; font-family: var(--mono); font-weight: 600; line-height: 1; letter-spacing: -0.04em; color: var(--oil); }
+      .mk { display: flex; flex-wrap: wrap; gap: 14px; position: absolute; left: 70px; width: 790px; }
+      .mk span { font-size: 56px; font-weight: 600; text-transform: uppercase; padding: 4px 22px; background: rgba(20,26,34,0.95); border: 2px solid var(--hair); border-top: 3px solid var(--oil); opacity: 0; }
+      .odo { position: absolute; left: 70px; top: 560px; display: flex; gap: 8px; }
+      .odo span { width: 104px; height: 164px; line-height: 164px; text-align: center; font-family: var(--mono); font-weight: 600; font-size: 124px; background: #0d1117; border: 3px solid rgba(150,165,182,0.45); color: var(--fg); overflow: hidden; }
+      .odo span.u { color: var(--oil); }
+      .litr { position: absolute; left: 60px; font-family: var(--mono); font-weight: 600; line-height: 1; color: var(--oil); letter-spacing: -0.05em; }
+      .litrU { position: absolute; font-size: 60px; font-weight: 600; text-transform: uppercase; }
+
+      /* engagement */
+      #eng { position: absolute; inset: 0; z-index: 25; pointer-events: none; }
+      #reelBar { position: absolute; right: 70px; top: 250px; height: 50px; display: flex; align-items: center; gap: 14px; opacity: 0; transform-origin: 100% 50%; }
+      #reelLab { font-family: var(--mono); font-size: 20px; letter-spacing: 0.2em; color: var(--oil); text-transform: uppercase; white-space: nowrap; text-shadow: 0 0 10px rgba(6,8,11,0.95); }
+      #reelWin { position: relative; width: 300px; height: 50px; overflow: hidden; border: 1px solid rgba(245,170,60,0.55); border-top: 2px solid var(--oil); background: rgba(9,12,17,0.94); }
+      #reelStrip { position: absolute; left: 0; right: 0; top: 0; }
+      #reelStrip div { height: 50px; line-height: 50px; padding: 0 14px; font-size: 31px; font-weight: 600; text-transform: uppercase; white-space: nowrap; color: var(--fg); }
+      #pickCard { position: absolute; left: 70px; width: 780px; top: 1110px; opacity: 0; }
+      #pickCard .q { font-size: 72px; font-weight: 600; text-transform: uppercase; line-height: 1; text-shadow: 0 6px 30px rgba(4,6,9,0.9); }
+      #pickCard .q em { font-style: normal; color: var(--oil); }
+      #pickOpts { display: flex; gap: 16px; margin-top: 18px; }
+      .pko { flex: 1; border: 2px solid var(--hair); background: rgba(9,12,17,0.93); padding: 12px 18px; }
+      .pko .v { font-size: 64px; font-weight: 600; line-height: 1; text-transform: uppercase; }
+      .pko .d { margin-top: 6px; font-family: var(--mono); font-size: 20px; color: var(--fg-2); text-transform: uppercase; letter-spacing: 0.04em; }
+      #pickC { display: flex; align-items: center; gap: 14px; margin-top: 14px; font-family: var(--mono); font-size: 25px; color: var(--fg); text-shadow: 0 0 10px rgba(6,8,11,0.95); opacity: 0; }
+      #pickC svg { width: 44px; height: 44px; flex: none; }
+      #serCard { position: absolute; left: 70px; width: 780px; top: 1170px; opacity: 0; }
+      #serCard .pill { display: inline-block; font-family: var(--mono); font-weight: 600; font-size: 24px; letter-spacing: 0.2em; color: #1a1206; background: var(--oil); padding: 7px 16px; text-transform: uppercase; }
+      #serCard .t { margin-top: 12px; font-size: 76px; font-weight: 600; text-transform: uppercase; line-height: 1; text-shadow: 0 6px 30px rgba(4,6,9,0.9); }
+      #serCard .t em { font-style: normal; color: var(--oil); }
+      #serFol { display: flex; align-items: center; gap: 18px; margin-top: 16px; }
+      #serBtn { width: 70px; height: 70px; border-radius: 50%; background: #ff2d55; position: relative; flex: none; }
+      #serBtn i { position: absolute; left: 50%; top: 50%; width: 30px; height: 6px; margin: -3px 0 0 -15px; background: #fff; border-radius: 3px; display: block; }
+      #serBtn i + i { transform: rotate(90deg); }
+      #serT { font-family: var(--mono); font-size: 26px; line-height: 1.3; color: var(--fg); text-shadow: 0 0 10px rgba(6,8,11,0.95); }
+      #serT b { color: var(--oil); }
+      #ytCard { position: absolute; left: 70px; width: 780px; top: 1100px; opacity: 0; }
+      #ytCard .yt { display: flex; align-items: center; gap: 18px; }
+      .ytP { width: 110px; height: 78px; border-radius: 20px; background: #ff0033; position: relative; flex: none; }
+      .ytP i { position: absolute; left: 44px; top: 22px; width: 0; height: 0; border-left: 30px solid #fff; border-top: 17px solid transparent; border-bottom: 17px solid transparent; }
+      .ytT b { display: block; font-size: 54px; font-weight: 600; line-height: 1; }
+      .ytT span { font-family: var(--mono); font-size: 24px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--fg-2); }
+      #ytCard .t { margin-top: 16px; font-size: 70px; font-weight: 600; line-height: 1.02; text-transform: uppercase; text-shadow: 0 6px 30px rgba(4,6,9,0.9); }
+      #ytCard .t em { font-style: normal; color: var(--oil); }
+      .ytR { display: flex; gap: 14px; margin-top: 16px; }
+      .ytM { font-family: var(--mono); font-weight: 600; font-size: 34px; padding: 6px 16px; background: rgba(9,12,17,0.94); border: 2px solid var(--hair); }
+      .ytL { font-family: var(--sans); font-weight: 600; font-size: 48px; text-transform: uppercase; padding: 0 22px; color: #1a1206; background: var(--oil); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="166.18" data-width="1080" data-height="1920">
+      <canvas id="gl" width="1080" height="1920"></canvas>
+
+      <svg id="svg" viewBox="0 0 1080 1920">
+        <g id="star" opacity="0" />
+        <g id="dial" opacity="0">
+          <circle cx="200" cy="1290" r="104" fill="rgba(9,12,17,0.9)" stroke="rgba(150,165,182,0.35)" stroke-width="2" />
+          <circle cx="200" cy="1290" r="80" fill="none" stroke="rgba(150,165,182,0.18)" stroke-width="1" />
+          <g id="dialTicks" />
+          <line id="dialP" x1="200" y1="1290" x2="200" y2="1196" stroke="#eef2f7" stroke-width="4" stroke-linecap="round" />
+          <circle cx="200" cy="1290" r="8" fill="#eef2f7" />
+        </g>
+        <g id="dim" opacity="0" />
+        <g id="rockG" opacity="0" />
+        <g id="tagLines" />
+      </svg>
+
+      <div id="ui">
+        <div class="shade-top"></div>
+        <div class="shade-bot"></div>
+        <div id="hk"><div id="hkK" class="kick">Seria silniki · część 6</div></div>
+        <div id="top"><div id="topK" class="kick"></div><div id="topH"></div></div>
+        <div class="chips" id="chSimple"><span class="chip ok" data-t="111.99">Proste</span><span class="chip ok" data-t="112.48">Wolne</span><span class="chip ok" data-t="113.32">Nie do zajechania</span></div>
+        <div id="cnt"><span class="n" id="cntN">0</span><span class="l" id="cntL"></span></div>
+
+        <div id="split"><div id="splitPill"></div></div>
+        <div class="pl" id="pA"><b></b><span class="st"></span></div>
+        <div class="pl" id="pB"><b></b><span class="st"></span></div>
+
+        <div id="badges"></div>
+        <div id="tags"></div>
+      </div>
+
+      <div class="pres" id="bd">
+        <div class="grid"></div>
+        <div class="grp" id="gOrder">
+          <div class="pk kick">Zapłon co 144°</div>
+          <div class="ph" id="orH"></div>
+          <svg class="bsvg" viewBox="0 0 1080 1920"><g id="orG" /></svg>
+        </div>
+        <div class="grp" id="gBetween">
+          <div class="pk kick">Pięć cylindrów</div>
+          <div class="ph" id="btH"></div>
+          <svg class="bsvg" viewBox="0 0 1080 1920"><g id="btG" /></svg>
+        </div>
+        <div class="grp" id="gLitres">
+          <div class="pk kick">Powód 1 · długość</div>
+          <div class="ph" id="ltH"></div>
+          <svg class="bsvg" viewBox="0 0 1080 1920"><g id="ltG" /></svg>
+        </div>
+        <div class="grp" id="gTrans">
+          <div class="pk kick" id="trK">Pod maską, widok z góry</div>
+          <div class="ph" id="trH"></div>
+          <svg class="bsvg" viewBox="0 0 1080 1920"><g id="trG" /></svg>
+        </div>
+        <div class="grp" id="gRows">
+          <div class="pk kick">Kto postawił na piątkę</div>
+          <div class="ph">Piątka <em>w poprzek</em></div>
+          <div class="rows" style="top:500px">
+            <div class="rw" data-t="53.35" data-st="54.7"><div class="nm">Volvo</div><div class="sb">cała gama <b>na piątkach</b></div><div class="st">R5</div></div>
+            <div class="rw" data-t="55.57" data-st="57.47"><div class="nm">Ford Focus RS</div><div class="sb">piątka <b>od Volvo</b></div><div class="st">R5</div></div>
+          </div>
+        </div>
+        <div class="grp" id="gOverlap">
+          <div class="pk kick">Powód 2 · kto pcha wał</div>
+          <div class="ph" id="ovH"></div>
+          <svg class="bsvg" viewBox="0 0 1080 1920"><g id="ovG" /></svg>
+        </div>
+        <div class="grp" id="gWaves">
+          <div class="pk kick">Powód 3 · rytm wydechu</div>
+          <div class="ph" id="wvH"></div>
+          <svg class="bsvg" viewBox="0 0 1080 1920"><g id="wvG" /></svg>
+        </div>
+        <div class="grp" id="gV10">
+          <div class="pk kick">Wielu mówi</div>
+          <div class="ph" id="vtH"></div>
+          <svg class="bsvg" viewBox="0 0 1080 1920"><g id="vtG" /></svg>
+        </div>
+        <div class="grp" id="gRally">
+          <div class="pk kick">Powód 4 · wyścigi</div>
+          <div class="yr" id="raY" style="top:470px;font-size:220px">80.</div>
+          <div class="ph" id="raH" style="top:720px">Audi <em>Quattro</em></div>
+          <div class="mk" id="raC" style="top:840px"><span data-t="94.26">5 cylindrów</span><span data-t="95.54">Turbo</span></div>
+          <svg class="bsvg" viewBox="0 0 1080 1920"><g id="raG" /></svg>
+        </div>
+        <div class="grp" id="gPikes">
+          <div class="pk kick">Pikes Peak</div>
+          <div class="yr" id="pkY" style="top:470px;font-size:220px">1987</div>
+          <div class="ph" id="pkH" style="top:710px">Walter <em>Röhrl</em></div>
+          <svg class="bsvg" viewBox="0 0 1080 1920"><g id="pkG" /></svg>
+          <div class="stampX oil" id="stRek" style="left:500px;top:1270px">Rekord trasy</div>
+        </div>
+        <div class="grp" id="gOdo">
+          <div class="pk kick">Powód 5 · trwałość</div>
+          <div class="ph" id="odH"></div>
+          <div class="odo" id="odo"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="lbl" style="left:74px;top:750px;font-size:40px;color:#eef2f7">km</div>
+          <svg class="bsvg" viewBox="0 0 1080 1920"><g id="odG" /></svg>
+        </div>
+        <div class="grp" id="gVolvo">
+          <div class="pk kick">Volvo</div>
+          <div class="ph" id="voH"></div>
+          <div class="litr" id="voN" style="top:480px;font-size:300px">0</div>
+          <div class="litrU" id="voU" style="left:470px;top:560px">lat<br>piątek</div>
+          <svg class="bsvg" viewBox="0 0 1080 1920"><g id="voG" /></svg>
+        </div>
+        <div class="grp" id="gTrophy">
+          <div class="pk kick">Silnik roku</div>
+          <div class="ph" id="tpH"></div>
+          <svg class="bsvg" viewBox="0 0 1080 1920"><g id="tpG" /></svg>
+        </div>
+        <div class="grp" id="gRS3">
+          <div class="pk kick">Dziś · Audi RS3</div>
+          <div class="litr" id="rsN" style="top:450px;font-size:300px">0</div>
+          <div class="litrU" style="left:74px;top:760px;color:#eef2f7">koni mechanicznych</div>
+          <div class="ph" id="rsH" style="top:880px">Siedzi <em>w poprzek</em></div>
+        </div>
+      </div>
+
+      <div id="eng">
+        <div id="reelBar"><div id="reelLab">Na końcu:</div><div id="reelWin"><div id="reelStrip"><div></div><div></div></div></div></div>
+        <div id="pickCard">
+          <div class="q">To jak? <em>Piątka</em> czy <em>szóstka</em>?</div>
+          <div id="pickOpts">
+            <div class="pko" id="pkA"><div class="v">R5</div><div class="d">krótka, warkot, rajdy</div></div>
+            <div class="pko" id="pkB"><div class="v">R6</div><div class="d">idealnie wyważona</div></div>
+          </div>
+          <div id="pickC"><svg viewBox="0 0 58 58"><path d="M8 10 H50 A4 4 0 0 1 54 14 V38 A4 4 0 0 1 50 42 H24 L12 52 V42 H8 A4 4 0 0 1 4 38 V14 A4 4 0 0 1 8 10 Z" fill="none" stroke="#f5aa3c" stroke-width="3.5" stroke-linejoin="round" /><circle cx="19" cy="26" r="3" fill="#f5aa3c" /><circle cx="29" cy="26" r="3" fill="#f5aa3c" /><circle cx="39" cy="26" r="3" fill="#f5aa3c" /></svg><span>Napisz, co wybierasz</span></div>
+        </div>
+        <div id="serCard">
+          <div class="pill">Część 6</div>
+          <div class="t">Który silnik <em>następny?</em></div>
+          <div id="serFol"><div id="serBtn"><i></i><i></i></div><div id="serT">Obserwuj, żeby<br><b>nie przegapić</b></div></div>
+        </div>
+        <div id="ytCard">
+          <div class="yt"><div class="ytP"><i></i></div><div class="ytT"><b>YouTube</b><span>pełny film</span></div></div>
+          <div class="t">V6 rozebrany <em>do ostatniej śruby</em></div>
+          <div class="ytR"><span class="ytM">8 min</span><span class="ytL">Link w bio</span></div>
+        </div>
+      </div>
+
+      <audio id="vo" src="assets/vo.mp3" data-start="0" data-duration="166.18" data-track-index="30"></audio>
+    </div>
+
+    <script type="importmap">
+      { "imports": { "three": "./model/vendor/three.module.js", "three/addons/": "./model/vendor/addons/" } }
+    </script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+    </script>
+    <script type="module" src="film/main.js"></script>
+  </body>
+</html>

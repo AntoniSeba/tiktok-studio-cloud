@@ -1,0 +1,118 @@
+/* 系统自带字体：用 local() 声明满足渲染器的字体解析 */
+@font-face{font-family:"PingFang SC";src:local("PingFang SC");font-weight:100 900;font-style:normal}
+@font-face{font-family:"Menlo";src:local("Menlo");font-weight:400 700;font-style:normal}
+@font-face{font-family:"Helvetica Neue";src:local("Helvetica Neue");font-weight:100 900;font-style:normal}
+
+/* ===========================================================
+   半调纸拼贴 · 信息版  —  豆包写初稿 HyperFrames 共用样式
+   继承 gbro-collage-ip 的视觉 DNA：
+   平涂纸场 + 卡纸剪片层级 + 单一点色 + 半调照片 + 统一纸影
+   画布 1080×1920 / 底部 640px 为字幕安全区
+   =========================================================== */
+
+:root{
+  --card:      #F6F1E4;   /* 主卡纸 */
+  --card-2:    #EAE1CC;   /* 次级卡纸 */
+  --keyline:   #FCF8ED;   /* 暖奶油刀口高光 */
+  --ink:       #26241F;
+  --muted:     #837C70;
+  --shadow:    0 16px 26px rgba(58,48,32,.16), 0 3px 5px rgba(58,48,32,.10);
+  --shadow-sm: 0 8px 14px rgba(58,48,32,.14), 0 2px 3px rgba(58,48,32,.09);
+  --safe-top:  1280px;    /* 信息只能落在 y <= 1280 */
+}
+/* 功能段配色：全部继承拼贴 6 条 C1-C6 的色本，不新发明颜色 */
+body.t-source{ --field:#EEE7D6; --accent:#1F5142; }  /* 取材   = 深绿 / 奶白场 */
+body.t-draft { --field:#E6E7E3; --accent:#18334D; }  /* 初稿   = 墨蓝 / 冷灰白场（= C3 点色）*/
+body.t-title { --field:#D8D0BC; --accent:#E0783C; }  /* 标题   = 珊瑚 / 暖石灰场（= C4 点色）*/
+body.t-frame { --field:#D8D0BC; --accent:#D6A92B; }  /* 钩子结尾 = 芥末 / 暖石灰场（= C1 C6）*/
+/* 三个 Skill 的固定色，供三联卡与标题卡取用 */
+:root{ --c-source:#1F5142; --c-draft:#18334D; --c-title:#E0783C; }
+
+*{box-sizing:border-box}
+html,body{margin:0;width:1080px;height:1920px;overflow:hidden}
+body{background:var(--field);color:var(--ink);
+  font-family:"PingFang SC","Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased}
+#root{position:relative;width:1080px;height:1920px;overflow:hidden;background:var(--field)}
+.clip{position:absolute;inset:0}
+
+/* ── 纸面质感（永远压在最上层，不参与动画）────────────── */
+.fiber{position:absolute;inset:0;pointer-events:none;opacity:.30;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='.42'/%3E%3C/svg%3E");
+  background-size:300px 300px}
+.grain{position:absolute;inset:0;pointer-events:none;opacity:.10;mix-blend-mode:multiply;
+  background-image:radial-gradient(rgba(40,34,24,1) .6px,transparent .7px);background-size:5px 5px}
+.vig{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 78% at 50% 34%, rgba(255,255,255,.16), rgba(70,58,40,.10) 78%)}
+
+/* ── 卡纸剪片 ─────────────────────────────────── */
+.cut{position:absolute;background:var(--card);border:2px solid var(--keyline);
+  box-shadow:var(--shadow);will-change:transform}
+.cut.sm{box-shadow:var(--shadow-sm)}
+.cut.acc{background:var(--accent);border-color:rgba(255,255,255,.30);color:#F6F1E4}
+.cut.dk{background:var(--card-2)}
+.cut.ghost{background:transparent;border:3px dashed rgba(60,52,40,.28);box-shadow:none}
+
+/* 大块点色纸形：出画裁切，给画面一个色彩重心 */
+.blob{position:absolute;border-radius:50%;background:var(--accent);will-change:transform}
+
+/* ── 半调文档剪片 ────────────────────────────────
+   抽象的「灰度 + 网点」虚化文档，不是任何界面的仿制。
+   拿到真实截图后：把 .shot 的 <div class="bars"> 换成
+   <img src="../assets/shots/xxx.png" class="shot-img">，其余不变。 */
+.shot{position:absolute;overflow:hidden;background:#CFCAC0;
+  border:2px solid var(--keyline);box-shadow:var(--shadow);will-change:transform,filter}
+.shot .bars{position:absolute;inset:0;padding:34px 30px;display:flex;flex-direction:column;gap:20px}
+.shot .bars i{display:block;height:16px;background:#8E8880;opacity:.85}
+.shot .bars i.w1{width:78%}.shot .bars i.w2{width:54%}.shot .bars i.w3{width:88%}
+.shot .bars i.w4{width:36%}.shot .bars i.w5{width:66%}
+.shot .bars i.tall{height:120px;width:100%;opacity:.5}
+.shot .dots{position:absolute;inset:0;mix-blend-mode:multiply;
+  background-image:radial-gradient(rgba(20,18,14,.62) 1.15px,transparent 1.3px);background-size:4px 4px}
+.shot-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  filter:grayscale(1) contrast(1.06)}
+
+/* ── 排版 ────────────────────────────────────── */
+.kicker{position:absolute;font:500 26px/1 "Menlo",monospace;letter-spacing:.20em;color:var(--accent)}
+.rule{position:absolute;height:5px;background:var(--accent);transform-origin:left center}
+.mono{font:500 24px/1.45 "Menlo",monospace;letter-spacing:.06em;color:var(--muted)}
+.h1{position:absolute;font-weight:600;font-size:104px;line-height:.98;letter-spacing:-.03em;margin:0}
+.h2{position:absolute;font-weight:600;font-size:64px;line-height:1.04;letter-spacing:-.02em;margin:0}
+.num{font:700 168px/1 "Helvetica Neue",Arial;letter-spacing:-.05em;color:var(--ink)}
+.num.acc{color:var(--accent)}
+.lbl{font-weight:600;font-size:46px;letter-spacing:-.01em}
+.idx{font:500 22px/1 "Menlo",monospace;letter-spacing:.18em;color:var(--muted)}
+.idx.on-acc{color:rgba(246,241,228,.72)}
+
+/* 点色批注：全帧只允许一处 */
+.box{position:absolute;border:5px solid var(--accent);background:transparent}
+.under{position:absolute;height:14px;background:var(--accent);opacity:.92;transform-origin:left center}
+.lead{position:absolute;background:var(--accent)}
+.dot{position:absolute;width:18px;height:18px;border-radius:50%;background:var(--accent)}
+
+/* 竖向色条（Skill 锁定色） */
+.stripe{position:absolute;left:0;top:0;bottom:0;width:30px;transform-origin:top center}
+
+/* 抽屉柜 */
+.drawer{position:absolute;background:var(--card);border:2px solid var(--keyline);
+  box-shadow:var(--shadow-sm);will-change:transform}
+.drawer .pull{position:absolute;right:22px;top:50%;margin-top:-4px;width:56px;height:8px;
+  background:rgba(60,52,40,.22)}
+.drawer .tag{position:absolute;left:28px;top:50%;transform:translateY(-50%);
+  font-weight:600;font-size:34px;letter-spacing:-.01em}
+
+/* 翻面卡 */
+.flip{position:absolute;transform-style:preserve-3d;will-change:transform}
+.flip .face{position:absolute;inset:0;backface-visibility:hidden;
+  background:var(--card);border:2px solid var(--keyline);box-shadow:var(--shadow);overflow:hidden}
+.flip .back{transform:rotateY(180deg);background:var(--card-2)}
+.flip .back .veil{position:absolute;inset:0;opacity:.5}
+
+/* 底部字幕安全区：只放纸场延续与撕边地层 */
+.safe-strata{position:absolute;left:0;right:0;bottom:0;height:400px;pointer-events:none}
+.safe-strata span{position:absolute;left:-40px;right:-40px;display:block}
+.torn-11{clip-path:polygon(0.0% 10.1%,3.2% 18.6%,6.1% 11.1%,9.3% 5.3%,12.3% 13.3%,16.2% 3.7%,18.6% 3.6%,22.5% 14.5%,24.2% 19.7%,28.5% 13.8%,31.8% 4.8%,33.5% 11.5%,35.2% 5.4%,37.5% 2.5%,40.4% 9.9%,44.4% 11.3%,47.8% 11.0%,51.2% 10.2%,53.6% 20.0%,58.0% 17.1%,61.6% 7.7%,63.8% 7.2%,65.6% 15.8%,68.3% 17.2%,71.0% 19.2%,75.0% 2.0%,77.2% 18.4%,80.1% 19.6%,82.8% 3.3%,86.2% 16.0%,88.5% 3.6%,91.0% 19.4%,94.8% 4.1%,97.1% 3.8%,98.8% 16.3%,100% 12.1%,100% 100%,0 100%)}
+.torn-22{clip-path:polygon(0.0% 19.2%,2.0% 2.4%,6.4% 5.3%,8.3% 13.7%,10.9% 18.0%,13.1% 19.3%,15.6% 12.8%,19.8% 14.3%,24.0% 14.7%,25.8% 17.9%,29.0% 7.6%,31.2% 17.3%,34.4% 18.9%,38.2% 19.3%,41.3% 14.6%,44.7% 6.7%,48.9% 7.6%,52.7% 19.2%,56.1% 4.6%,60.1% 14.0%,62.2% 2.9%,65.3% 2.6%,69.4% 11.1%,72.5% 9.4%,75.9% 18.5%,78.4% 8.7%,81.6% 7.4%,84.9% 11.8%,87.7% 14.1%,90.8% 3.6%,95.2% 8.4%,98.0% 9.3%,100% 19.1%,100% 100%,0 100%)}
+.torn-33{clip-path:polygon(0.0% 12.3%,3.4% 16.7%,5.7% 13.7%,9.8% 18.4%,12.0% 13.7%,15.3% 11.1%,19.6% 11.5%,22.4% 19.0%,25.8% 7.4%,28.3% 10.9%,30.0% 12.9%,33.7% 9.7%,37.7% 18.7%,40.8% 14.3%,42.8% 3.0%,47.1% 7.1%,49.3% 18.1%,53.0% 4.2%,55.5% 6.4%,57.9% 2.1%,60.9% 7.5%,63.6% 5.3%,65.5% 2.6%,69.6% 15.5%,72.7% 4.2%,74.8% 4.2%,77.3% 3.0%,79.6% 5.7%,81.8% 13.8%,84.6% 10.5%,87.2% 11.7%,91.0% 7.5%,92.8% 10.7%,95.5% 16.0%,97.4% 17.7%,99.1% 11.8%,100% 7.7%,100% 100%,0 100%)}
+
+/* 动画初始态：由 GSAP set() 接管，这里只给需要遮罩揭示的元素兜底 */
+.mask-reveal{clip-path:inset(0 100% 0 0)}

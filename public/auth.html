@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TikTok Studio: konto</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Public+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+</head>
+<body>
+<header class="top"><div class="wrap"><a class="logo" href="/"><i aria-hidden="true"></i>TikTok Studio</a></div></header>
+<main class="auth">
+
+  <form class="card" method="post" action="#" id="f-register" data-mode="/rejestracja" hidden novalidate>
+    <h1>Załóż konto</h1>
+    <p class="hint">Za chwilę przeprowadzimy Cię przez konfigurację kanału i pierwszy film.</p>
+    <label class="f" for="r-name">Imię</label>
+    <input class="i" id="r-name" name="name" autocomplete="given-name" maxlength="80" placeholder="np. Antoni">
+    <label class="f" for="r-email">E-mail</label>
+    <input class="i" id="r-email" name="email" type="email" autocomplete="email" required>
+    <label class="f" for="r-pass">Hasło</label>
+    <div class="pw-wrap"><input class="i" id="r-pass" name="password" type="password" autocomplete="new-password" minlength="8" required><button type="button" class="pw-toggle">Pokaż</button></div>
+    <p class="fine">Co najmniej 8 znaków.</p>
+    <button class="btn" type="submit">Załóż konto</button>
+    <div class="msg" role="alert"></div>
+    <p class="alt">Masz już konto? <a href="/logowanie">Zaloguj się</a></p>
+  </form>
+
+  <form class="card" method="post" action="#" id="f-login" data-mode="/logowanie" hidden novalidate>
+    <h1>Zaloguj się</h1>
+    <p class="hint">Wracasz do swojego kalendarza i filmów.</p>
+    <label class="f" for="l-email">E-mail</label>
+    <input class="i" id="l-email" name="email" type="email" autocomplete="email" required>
+    <label class="f" for="l-pass">Hasło</label>
+    <div class="pw-wrap"><input class="i" id="l-pass" name="password" type="password" autocomplete="current-password" required><button type="button" class="pw-toggle">Pokaż</button></div>
+    <button class="btn" type="submit">Zaloguj się</button>
+    <div class="msg" role="alert"></div>
+    <p class="alt"><a href="/reset-hasla">Nie pamiętasz hasła?</a><br>Nie masz konta? <a href="/rejestracja">Załóż konto</a></p>
+  </form>
+
+  <form class="card" method="post" action="#" id="f-forgot" data-mode="/reset-hasla" hidden novalidate>
+    <h1>Reset hasła</h1>
+    <p class="hint">Podaj e-mail konta. Wyślemy link do ustawienia nowego hasła.</p>
+    <label class="f" for="fg-email">E-mail</label>
+    <input class="i" id="fg-email" name="email" type="email" autocomplete="email" required>
+    <button class="btn" type="submit">Wyślij link</button>
+    <div class="msg" role="alert"></div>
+    <p class="alt"><a href="/logowanie">Wróć do logowania</a></p>
+  </form>
+
+  <form class="card" method="post" action="#" id="f-reset" hidden novalidate>
+    <h1>Nowe hasło</h1>
+    <p class="hint">Ustaw nowe hasło. Po zapisaniu od razu Cię zalogujemy.</p>
+    <label class="f" for="rs-pass">Nowe hasło</label>
+    <div class="pw-wrap"><input class="i" id="rs-pass" name="password" type="password" autocomplete="new-password" minlength="8" required><button type="button" class="pw-toggle">Pokaż</button></div>
+    <p class="fine">Co najmniej 8 znaków.</p>
+    <button class="btn" type="submit">Zapisz hasło</button>
+    <div class="msg" role="alert"></div>
+  </form>
+
+</main>
+<script src="/assets/auth.js"></script>
+</body>
+</html>
