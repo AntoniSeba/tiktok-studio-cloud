@@ -264,6 +264,58 @@ test('PDF upload: only PDFs, text extracted, attachment must belong to the accou
   if (st.ready) assert.equal((await other('POST', '/api/generate', { topic: 'x', attachment_id: r.upload.id, start: false })).status, 400);
 });
 
+test('music library: upload real audio, favourites, isolation, delete', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const { readFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const wav = `${tmpdir()}/tss-test-${Date.now()}.wav`;
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2', wav]);
+  const c = client();
+  await c('POST', '/api/auth/register', { email: 'muzyka@example.com', password: 'haslo-muzyki-1' });
+  const send = (body, name) => fetch(base + `/api/music/upload?name=${name}`, { method: 'POST', headers: { 'X-Requested-With': 'fetch', 'Content-Type': 'application/octet-stream', Cookie: c.cookie() }, body }).then(r => r.json().then(j => ({ status: r.status, j })));
+  assert.equal((await send('to nie jest audio, tylko tekst'.repeat(10), 'x.mp3')).status, 400);
+  assert.equal((await send(readFileSync(wav), 'x.exe')).status, 400);
+  const ok1 = await send(readFileSync(wav), 'Ton%20testowy.wav');
+  rmSync(wav, { force: true });
+  assert.equal(ok1.status, 200);
+  const list = (await c('GET', '/api/music?filter=fav')).json.music;
+  assert.equal(list.length, 1);
+  assert.equal(list[0].title, 'Ton testowy');
+  assert.ok(list[0].duration > 1.5);
+  assert.equal((await c('GET', `/api/music/${ok1.j.id}/file`)).status, 200);
+  const other = client();
+  await other('POST', '/api/auth/register', { email: 'muzyka2@example.com', password: 'haslo-muzyki-2' });
+  assert.equal((await other('GET', `/api/music/${ok1.j.id}/file`)).status, 404);
+  assert.equal((await other('DELETE', `/api/music/${ok1.j.id}`)).status, 404);
+  assert.equal((await other('GET', '/api/music')).json.music.length, 0);
+  assert.equal((await c('PUT', `/api/music/${ok1.j.id}`, { favorite: false, mood: 'spokojny' })).status, 200);
+  assert.equal((await c('GET', '/api/music?filter=fav')).json.music.length, 0);
+  assert.equal((await c('POST', '/api/music/link', { url: 'http://127.0.0.1:4318/x.mp3' })).status, 400);   // no private addresses
+  assert.equal((await c('DELETE', `/api/music/${ok1.j.id}`)).status, 200);
+});
+
+test('subskills, full stats, account colour and inspiration guards', async () => {
+  const c = client();
+  await c('POST', '/api/auth/register', { email: 'sub@example.com', password: 'haslo-sub-123' });
+  const ch = (await c('POST', '/api/channels', { name: 'Konto A', color: '#ff0066' })).json;
+  assert.equal((await c('GET', '/api/channels')).json.channels[0].color, '#ff0066');
+  assert.equal((await c('POST', '/api/subskills', { name: '' })).status, 400);
+  const sub = await c('POST', '/api/subskills', { name: 'Logo w rogu', body: 'Pokaż logo', default_on: true });
+  assert.equal(sub.status, 200);
+  const other = client();
+  await other('POST', '/api/auth/register', { email: 'sub2@example.com', password: 'haslo-sub-456' });
+  assert.equal((await other('PUT', `/api/subskills/${sub.json.id}`, { name: 'x' })).status, 404);
+  assert.equal((await other('GET', '/api/subskills')).json.subskills.length, 0);
+  const v = (await c('POST', '/api/videos', { title: 'Film ze statystykami', channel_id: ch.channel?.id })).json.video;
+  const st = await c('PUT', `/api/videos/${v.id}/stats`, { views: 1000, src_fyp: 140, reached: 900.4, retention_curve: '100, 80, x, 61, 300' });
+  assert.equal(st.json.video.src_fyp, 100);
+  assert.equal(st.json.video.reached, 900);
+  assert.equal(st.json.video.retention_curve, '100,80,61');
+  assert.equal((await c('POST', '/api/inspire/link', { url: 'https://example.com/video' })).status, 400);
+  assert.equal((await c('GET', '/api/inspire/999999')).status, 404);
+  assert.equal((await c('POST', '/api/inspire/999999/remix', {})).status, 409);
+});
+
 test('time zone helpers', () => {
   assert.equal(zonedToUtc('2026-07-01', '18:00', 'Europe/Warsaw'), '2026-07-01T16:00:00.000Z');
   assert.equal(zonedToUtc('2026-01-15', '08:30', 'America/New_York'), '2026-01-15T13:30:00.000Z');

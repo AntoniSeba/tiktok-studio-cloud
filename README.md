@@ -17,6 +17,11 @@ To wielokontowa wersja lokalnego TikTok Studio (`../tiktok-studio`), z własnym 
 | Generator | `src/generator.js` + `kit/`: agent dostaje brief (`kit/PIPELINE.md`, cel i kontrakt techniczny, bez narzuconego stylu), szkielet HyperFrames (`kit/starter`), narzędzia lektora (Gemini TTS), napisów (whisper), efektów, obrazów AI, podglądu obrazów dla modeli tekstowych (`look.py`) i kontroli. Formaty: TikTok pionowy, długi pionowy, długi 16:9. Opcjonalny PDF jako materiał źródłowy. |
 | Style wizualne | W oknie "Wygeneruj film" wybierasz styl, a każdy ma prawdziwy klip przykładowy. Style to skille HyperFrames pobrane od ich autorów (`kit/styles`, manifest `kit/styles/styles.json`, podglądy `public/styles`): 9 gatunków (postacie 3D, bajka rysowana, kinetyczna typografia, wykresy, diagram, kolaż Vox, mechanizm 3D, komiks, motion premium) i 18 stylów z pakietu Creator Style Kit (spolszczone fonty i treść). "Auto" = agent dobiera sam. Podglądy pakietu: `bash scripts/render-style-previews.sh`. |
 | B-roll z internetu | Opcja w oknie generowania: agent pobiera prawdziwe ujęcia z Pexels (`kit/tools/broll.py`, zdjęcia awaryjnie z Openverse) i zapisuje autorów w `meta.json`. Wymaga `PEXELS_API_KEY`. |
+| Konta TikTok | Dowolnie wiele kont (kanałów) w jednym studiu: przełącznik zawsze w menu, kolor konta, osobne filmy, kalendarz, kolejka i ustawienia generatora. Film można przenieść na inne konto. |
+| Muzyka | Biblioteka utworów (`src/music.js`): wgrany plik, link (yt-dlp), trendy z TikToka (Apify) i kurator AI (OpenRouter), codziennie rano, jeśli włączone. Ulubione są kopiowane do zadania generatora i trafiają cicho pod lektora. |
+| Inspiracje | Wyszukiwarka TikToków na temat (Apify) albo wklejony link, analiza filmu (`src/inspire.js`: cięcia, klatki, transkrypcja, model wizyjny pisze rozbiór psychologii i "przepis do remiksu") i remiks do Pomysłów. Generator dostaje analizę i klatki w folderze zadania. |
+| Dodatki i research | Własne dodatki do promptu generatora (Ustawienia, zaznaczane w oknie generowania) i research konkurencji przed startem zadania (Apify). |
+| Pełne statystyki | Oprócz podstawowych wyników: łączny czas oglądania, zasięg, wyświetlenia profilu, źródła ruchu, nowi i powracający widzowie, krzywa retencji. |
 | Kolejka renderów | Filmy robią się po kolei (`GEN_MAX_CONCURRENT`). Film można dodać bez startu ("czeka na start") i uruchomić później. Restart serwera wraca zadanie na początek kolejki. Limity: dzienny i wielkość kolejki na konto. |
 | Agent | Zakładka Agent: czat (DeepSeek przez OpenRouter, narzędzia do całej aplikacji), odpowiedzi strumieniowane. Jedno polecenie typu "seria 20 filmów o X i wyrenderuj" dodaje tematy i kolejkę renderów. |
 | Maile | Plan dnia o wybranej godzinie, przypomnienie w godzinie publikacji, raport tygodniowy. Liczone w strefie czasowej konta. Bez kluczy Brevo tryb DRY (tylko log). |
@@ -27,7 +32,7 @@ To wielokontowa wersja lokalnego TikTok Studio (`../tiktok-studio`), z własnym 
 npm install
 cp .env.example .env    # uzupełnij OPENROUTER_API_KEY, opcjonalnie BREVO_*
 npm run dev             # http://localhost:4318
-npm test                # 16 testów API na bazie w pamięci
+npm test                # 20 testów API na bazie w pamięci
 ```
 
 ## Konfiguracja (.env)
@@ -43,6 +48,9 @@ Sekrety są tylko w `.env` (w `.gitignore`). Wzór: `.env.example`.
 | `OPENROUTER_FALLBACKS` | Modele zapasowe, gdy dostawca domyślnego zwróci błąd. |
 | `BREVO_SMTP_USER`, `BREVO_SMTP_KEY`, `MAIL_FROM` | Wysyłka maili. `MAIL_FROM` musi być z domeny zweryfikowanej w Brevo. |
 | `DB_PATH` | Plik SQLite, domyślnie `data/cloud.db`. |
+| `APIFY_API_TOKEN` | Trendy muzyczne, wyszukiwarka Inspiracji, research konkurencji. Bez klucza te trzy opcje są wyłączone, reszta działa. |
+| `PEXELS_API_KEY` | B-roll z internetu w generatorze. |
+| `VISION_MODEL` | Model do analizy TikToków (domyślnie `google/gemini-2.5-flash`). |
 
 ## Wdrożenie (VPS Soft Synergy)
 
@@ -70,7 +78,10 @@ src/auth.js        hasła, sesje, klucze API, limity
 src/ai.js          asystent AI (OpenRouter), czyszczenie odpowiedzi
 src/importers.js   CSV z TikTok Studio, strefy czasowe
 src/analysis.js    wynik filmu i porównanie cech
-src/scheduler.js   maile per konto, co 5 minut
+src/scheduler.js   maile per konto, co 5 minut; codzienna muzyka
+src/music.js       biblioteka muzyki (pliki, linki, trendy, kurator AI)
+src/inspire.js     Inspiracje: wyszukiwarka, analiza TikToka, remiks, research konkurencji
+src/services.js    OpenRouter, Apify, ustawienia per konto
 public/            landing, logowanie, dokumentacja, aplikacja (app/)
 test/api.test.js   test całej ścieżki
 ```

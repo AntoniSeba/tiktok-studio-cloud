@@ -279,3 +279,30 @@ pre.joblog { max-height: 260px; overflow: auto; font-size: 12px; white-space: pr
   .sp-info b { margin-top: 0; }
   .sp-list { max-height: 340px; }
 }
+
+/* ---- TikTok accounts switcher ---- */
+.acct-l { display: inline-flex; align-items: center; gap: 7px; }
+.acct-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; vertical-align: 1px; flex: none; }
+.acct-l .acct-dot { margin-right: 0; }
+.acct-add { margin-top: 6px; background: none; border: 0; padding: 4px 0; font: 600 13px var(--body); color: var(--cyan-ink); cursor: pointer; text-align: left; }
+.acct-add:hover { text-decoration: underline; }
+
+/* ---- inspiration cards ---- */
+.icards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.icard { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; display: flex; flex-direction: column; }
+.icover { position: relative; aspect-ratio: 9 / 12; background: var(--soft); overflow: hidden; }
+.icover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.icover span { position: absolute; right: 8px; bottom: 8px; background: rgba(0,0,0,.7); color: #fff; font-size: 12px; font-weight: 600; padding: 2px 7px; border-radius: 6px; }
+.ibody { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.ibody small { color: var(--slate); font-size: 13px; }
+.ibody p { margin: 0; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.iacts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 6px; }
+.iframes { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; }
+.iframes img { height: 220px; border-radius: 8px; border: 1px solid var(--line); flex: none; }
+.mdbox { font-size: 15px; line-height: 1.55; overflow-wrap: anywhere; }
+.mdbox table { border-collapse: collapse; width: 100%; font-size: 13.5px; display: block; overflow-x: auto; }
+.mdbox td, .mdbox th { border: 1px solid var(--line); padding: 5px 8px; vertical-align: top; }
+.spin.sm { width: 11px; height: 11px; border-width: 2px; vertical-align: -1px; }
+fieldset.subs { border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px 4px; margin: 4px 0 14px; }
+fieldset.subs legend { font-weight: 600; padding: 0 6px; }
+fieldset.subs small { color: var(--slate); }

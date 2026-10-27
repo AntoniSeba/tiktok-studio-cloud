@@ -115,7 +115,10 @@ export function requireUser(req, res, next) {
 // ---- rate limit -------------------------------------------------------------
 const buckets = new Map();
 /** Allows `max` hits per `windowMs` per key (ip + route). */
+// the test suite signs up many accounts from one address; it raises every limit instead of disabling it
+const LIMIT_SCALE = process.env.NODE_ENV === 'test' ? 10 : 1;
 export function rateLimit(name, max, windowMs) {
+  max *= LIMIT_SCALE;
   return (req, res, next) => {
     const key = `${name}:${req.ip}`;
     const now = Date.now();

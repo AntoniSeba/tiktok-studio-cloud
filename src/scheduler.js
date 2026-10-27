@@ -3,6 +3,7 @@
 // reminders, and the weekly "what is winning" report. Sent dates are stored on
 // the workspace, so a restart never sends the same digest twice.
 import cron from 'node-cron';
+import { dailyMusicJob } from './music.js';
 import { db, listVideos } from './db.js';
 import { sendMail, emailShell, esc } from './mailer.js';
 import { analyze } from './analysis.js';
@@ -82,5 +83,7 @@ export async function tick(now = new Date()) {
 
 export function startScheduler() {
   cron.schedule('*/5 * * * *', () => tick().catch(e => console.error('[scheduler]', e)));
+  // music library: trending sounds and the AI curator, once a day, only for workspaces that switched it on
+  cron.schedule(process.env.MUSIC_CRON || '20 6 * * *', () => dailyMusicJob().catch(e => console.error('[music]', e)));
   console.log('[scheduler] co 5 minut: digest, przypomnienia, raport tygodniowy (strefa czasowa każdego konta)');
 }

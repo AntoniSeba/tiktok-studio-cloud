@@ -126,6 +126,8 @@ const ICON = {
   bot: '<rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9 16h6"/>',
   spark: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/>',
   plug: '<path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0zM12 16v5"/>',
+  music: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
 };
 const ROUTES = [
@@ -135,6 +137,8 @@ const ROUTES = [
   ['/app/kalendarz', 'Kalendarz', 'cal', viewCalendar],
   ['/app/generator', 'Kolejka renderów', 'spark', viewGenerator],
   ['/app/kolejka', 'Pomysły', 'queue', viewQueue],
+  ['/app/inspiracje', 'Inspiracje', 'eye', viewInspire],
+  ['/app/muzyka', 'Muzyka', 'music', viewMusic],
   ['/app/analiza', 'Analiza', 'chart', viewAnalysis],
   ['/app/integracje', 'Integracje', 'plug', viewIntegrations],
   ['/app/ustawienia', 'Ustawienia', 'gear', viewSettings],
@@ -147,10 +151,14 @@ function renderChrome() {
   const counts = { '/app/filmy': S.videos.length || '', '/app/kalendarz': late ? `zaległe: ${late}` : '', '/app/kolejka': open || '', '/app/generator': S.jobs.filter(j => ['queued', 'running'].includes(j.status)).length || '' };
   $('#nav').innerHTML = ROUTES.map(([p, label, ic]) => `<a href="${p}" data-link class="${location.pathname === p ? 'on' : ''} ${p === '/app/kalendarz' && late ? 'warn' : ''}" ${location.pathname === p ? 'aria-current="page"' : ''}>
     <svg viewBox="0 0 24 24" aria-hidden="true">${ICON[ic]}</svg>${label}${counts[p] ? `<span class="count">${counts[p]}</span>` : ''}</a>`).join('');
+  // TikTok accounts (channels): always visible, so adding a second account is one click away
   const chs = S.me.channels;
   const sel = $('#chsel');
-  sel.hidden = chs.length < 2;
-  if (chs.length > 1) sel.innerHTML = `<label>Kanał<select class="i" id="ch-switch"><option value="">Wszystkie kanały</option>${chs.map(c => `<option value="${c.id}" ${String(c.id) === S.channel ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>`;
+  sel.hidden = !chs.length;
+  const cur = chs.find(c => String(c.id) === S.channel);
+  if (chs.length) sel.innerHTML = `<label><span class="acct-l"><i class="acct-dot" style="background:${esc(cur?.color || (chs.length > 1 ? 'var(--mute)' : chs[0].color || '#22b8cf'))}"></i>Konto TikTok</span>
+    <select class="i" id="ch-switch">${chs.length > 1 ? '<option value="">Wszystkie konta</option>' : ''}${chs.map(c => `<option value="${c.id}" ${String(c.id) === S.channel ? 'selected' : ''}>${esc(c.name)}${c.handle ? ` (${esc(c.handle)})` : ''}</option>`).join('')}</select></label>
+    <button type="button" class="acct-add" data-act="edit-channel">+ Dodaj konto TikTok</button>`;
   const u = S.me.user || {};
   const th = theme();
   $('#me').innerHTML = `<b>${esc(u.name || u.email)}</b>${u.name ? esc(u.email || '') + '<br>' : ''}<button type="button" data-act="logout">Wyloguj się</button>
@@ -308,6 +316,19 @@ function statsModal(v) {
     ${field('Zapisy', inp('saves', val('saves'), 'inputmode="numeric"'))}
     ${field('Nowi obserwujący', inp('followers', val('followers'), 'inputmode="numeric"'))}
     ${field('Data publikacji', inp('publish_date', v.publish_date || (v.next_slot ? localDate(v.next_slot) : today()), 'type="date"'))}
+    <details class="more full" ${v.reached || v.src_fyp || v.retention_curve ? 'open' : ''}><summary>Pełna analityka z TikTok Studio (opcjonalnie)</summary><div class="fgrid">
+      ${field('Łączny czas oglądania (s)', inp('total_watch_time', val('total_watch_time'), 'inputmode="decimal"'))}
+      ${field('Zasięg (unikalni widzowie)', inp('reached', val('reached'), 'inputmode="numeric"'))}
+      ${field('Wyświetlenia profilu', inp('profile_views', val('profile_views'), 'inputmode="numeric"'))}
+      ${field('Nowi widzowie (%)', inp('new_viewers', val('new_viewers'), 'inputmode="decimal"'))}
+      ${field('Powracający widzowie (%)', inp('returning_viewers', val('returning_viewers'), 'inputmode="decimal"'))}
+      ${field('Ruch: Dla Ciebie (%)', inp('src_fyp', val('src_fyp'), 'inputmode="decimal"'))}
+      ${field('Ruch: profil (%)', inp('src_profile', val('src_profile'), 'inputmode="decimal"'))}
+      ${field('Ruch: obserwowani (%)', inp('src_following', val('src_following'), 'inputmode="decimal"'))}
+      ${field('Ruch: wyszukiwanie (%)', inp('src_search', val('src_search'), 'inputmode="decimal"'))}
+      ${field('Ruch: dźwięk (%)', inp('src_sound', val('src_sound'), 'inputmode="decimal"'))}
+      ${field('Krzywa retencji (% widzów co sekundę)', inp('retention_curve', v.retention_curve || '', 'placeholder="np. 100, 81, 70, 64, 60"'), 'Z wykresu "Utrzymanie widzów". Pokazujemy, gdzie ludzie odpadają.', 'full')}
+    </div></details>
     ${field('Notatki', `<textarea class="i" name="notes" maxlength="2000" placeholder="Co zadziałało, co nie">${esc(v.notes || '')}</textarea>`, '', 'full')}
   </div><div class="err-inline" data-err></div>
   <div class="foot"><button type="button" class="btn ghost" data-act="close">Anuluj</button><button class="btn" type="submit">Zapisz wyniki</button></div></form>`);
@@ -502,9 +523,14 @@ async function viewSettings() {
       </form>
     </section>
     <div style="display:grid;gap:18px;align-content:start">
-      <section class="panel"><h2>Kanały</h2>
-        <div class="rows">${S.me.channels.map(c => `<div class="rowi"><div class="main"><b>${esc(c.name)}</b><small>${esc([c.handle, c.niche].filter(Boolean).join(', ') || 'bez opisu')}</small></div><div class="acts"><button class="btn sm ghost" data-act="edit-channel" data-id="${c.id}">Edytuj</button>${S.me.channels.length > 1 ? `<button class="btn sm danger" data-act="del-channel" data-id="${c.id}">Usuń</button>` : ''}</div></div>`).join('') || '<p style="margin:0;color:var(--slate)">Brak kanału.</p>'}</div>
-        <button class="btn sm ghost" style="margin-top:12px" data-act="edit-channel">Dodaj kanał</button>
+      <section class="panel"><h2>Konta TikTok</h2>
+        <div class="rows">${S.me.channels.map(c => `<div class="rowi"><div class="main"><b><i class="acct-dot" style="background:${esc(c.color || '#22b8cf')}"></i>${esc(c.name)}</b><small>${esc([c.handle, c.niche].filter(Boolean).join(', ') || 'bez opisu')}</small></div><div class="acts"><button class="btn sm ghost" data-act="edit-channel" data-id="${c.id}">Edytuj</button>${S.me.channels.length > 1 ? `<button class="btn sm danger" data-act="del-channel" data-id="${c.id}">Usuń</button>` : ''}</div></div>`).join('') || '<p style="margin:0;color:var(--slate)">Brak kanału.</p>'}</div>
+        <button class="btn sm ghost" style="margin-top:12px" data-act="edit-channel">Dodaj konto TikTok</button>
+      </section>
+      <section class="panel"><h2>Dodatki do generatora</h2>
+        <p style="margin-top:0;color:var(--slate);font-size:14px">Własne instrukcje, które włączasz w oknie "Wygeneruj film", np. "zawsze pokaż logo w rogu" albo "kończ pytaniem do komentarzy".</p>
+        <div class="rows" data-subskills><div class="loading"><span class="spin"></span></div></div>
+        <button class="btn sm ghost" style="margin-top:12px" data-act="sub-edit">Dodaj dodatek</button>
       </section>
       <section class="panel"><h2>Hasło</h2>
         <form data-form="password" novalidate>
@@ -519,20 +545,40 @@ async function viewSettings() {
       </section>
     </div>
   </div>`;
+  loadSubskills().then(list => {
+    const box = $('[data-subskills]'); if (!box) return;
+    box.innerHTML = list.map(x => `<div class="rowi"><div class="main"><b>${esc(x.name)}</b><small>${esc(x.body.slice(0, 120))}${x.default_on ? ' · włączony domyślnie' : ''}${x.enabled ? '' : ' · ukryty'}</small></div>
+      <div class="acts"><button class="btn sm ghost" data-act="sub-edit" data-id="${x.id}">Edytuj</button><button class="btn sm danger" data-act="sub-del" data-id="${x.id}">Usuń</button></div></div>`).join('')
+      || '<p style="margin:0;color:var(--slate)">Brak dodatków.</p>';
+  }).catch(e => toast(e.message, true));
+}
+async function loadSubskills() { S.subskills = (await api('GET', '/api/subskills')).subskills; return S.subskills; }
+function subskillModal(x) {
+  x = x || {};
+  openModal(`<h2 id="modal-title">${x.id ? 'Edytuj dodatek' : 'Nowy dodatek do generatora'}</h2>
+  <p class="sub">Tekst trafia do zadania agenta, gdy zaznaczysz ten dodatek przy generowaniu.</p>
+  <form data-form="subskill" data-id="${x.id || ''}" novalidate>
+    ${field('Nazwa', inp('name', x.name, 'required maxlength="80" autofocus placeholder="np. Logo w rogu"'))}
+    ${field('Instrukcja dla agenta', `<textarea class="i" name="body" maxlength="4000" rows="6" placeholder="np. W prawym górnym rogu przez cały film małe logo marki (tekst WR w kółku).">${esc(x.body || '')}</textarea>`)}
+    <label class="check"><input type="checkbox" name="default_on" ${x.default_on ? 'checked' : ''}> <span>Zaznaczony domyślnie w oknie generowania</span></label>
+    <label class="check"><input type="checkbox" name="enabled" ${x.enabled === 0 ? '' : 'checked'}> <span>Pokazuj w oknie generowania</span></label>
+    <div class="err-inline" data-err></div>
+    <div class="foot"><button type="button" class="btn ghost" data-act="close">Anuluj</button><button class="btn" type="submit">${x.id ? 'Zapisz' : 'Dodaj'}</button></div>
+  </form>`);
 }
 
 function channelModal(c) {
   c = c || {};
-  openModal(`<h2 id="modal-title">${c.id ? 'Edytuj kanał' : 'Dodaj kanał'}</h2><p class="sub">Opis kanału pomaga asystentowi AI i porządkuje filmy.</p>
+  openModal(`<h2 id="modal-title">${c.id ? 'Edytuj konto TikTok' : 'Dodaj konto TikTok'}</h2><p class="sub">Każde konto ma własne filmy, kalendarz, kolejkę i ustawienia generatora. Opis pomaga agentowi pisać pod to konto.</p>
   <form data-form="channel" data-id="${c.id || ''}" novalidate>
     ${field('Nazwa kanału', inp('name', c.name, 'required maxlength="80" autofocus placeholder="np. Nauka na luzie"'))}
-    ${field('Nazwa na TikToku', inp('handle', c.handle, 'maxlength="60" placeholder="@nazwa"'))}
+    <div class="fgrid">${field('Nazwa na TikToku', inp('handle', c.handle, 'maxlength="60" placeholder="@nazwa"'))}${field('Kolor konta', `<input class="i" name="color" type="color" value="${esc(c.color || '#22b8cf')}">`, 'Widać go w przełączniku kont.')}</div>
     ${field('O czym jest kanał', `<textarea class="i" name="niche" maxlength="400" placeholder="np. metody nauki dla studentów, krótkie triki przed egzaminem">${esc(c.niche || '')}</textarea>`)}
     ${field('Dla kogo', inp('audience', c.audience, 'maxlength="300" placeholder="np. studenci 1. i 2. roku"'))}
     ${field('Cel', inp('goal', c.goal, 'maxlength="300" placeholder="np. pobrania aplikacji, obserwujący"'))}
     ${channelGenFields(c)}
     <div class="err-inline" data-err></div>
-    <div class="foot"><button type="button" class="btn ghost" data-act="close">Anuluj</button><button class="btn" type="submit">${c.id ? 'Zapisz' : 'Dodaj kanał'}</button></div>
+    <div class="foot"><button type="button" class="btn ghost" data-act="close">Anuluj</button><button class="btn" type="submit">${c.id ? 'Zapisz' : 'Dodaj konto'}</button></div>
   </form>`);
 }
 
@@ -625,6 +671,8 @@ function genModal(queueId) {
     ${channelSelect(q?.channel_id)}
     ${field('Format', `<select class="i" name="format"><option value="short">TikTok pionowy (20-90 s)</option><option value="long_vertical">Długi pionowy (2-10 min)</option><option value="long_wide">Długi poziomy 16:9, YouTube (2-10 min)</option></select>`)}
     ${stylePicker(g)}
+    <label class="check"><input type="checkbox" name="research" ${g.research ? '' : 'disabled'} ${g.research && lsGet('tss-research') === '1' ? 'checked' : ''}> <span>Research konkurencji przed startem: agent dostanie najmocniejsze TikToki na ten temat${g.research ? ' (ok. 1-2 min, Apify)' : '. Niedostępne: brak APIFY_API_TOKEN na serwerze'}</span></label>
+    <div data-gen-subs></div>
     <label class="check"><input type="checkbox" name="broll" ${g.broll ? '' : 'disabled'} ${g.broll && lsGet('tss-broll') === '1' ? 'checked' : ''}> <span>Dorzuć prawdziwe ujęcia z internetu (b-roll z Pexels, darmowa licencja)${g.broll ? '' : '. Niedostępne: brak klucza PEXELS_API_KEY na serwerze'}</span></label>
     <details class="more"><summary>Opcje filmu: długość, lektor, własny skrypt</summary><div class="fgrid">
       ${field('Długość (s)', `<input class="i" name="length_sec" type="number" min="20" max="600" placeholder="${ch.length_sec || 40} (TikTok), 180-360 (długi)">`, 'Puste = domyślna dla formatu.')}
@@ -638,6 +686,11 @@ function genModal(queueId) {
     <div class="foot"><button type="button" class="btn ghost" data-act="close">Anuluj</button><button class="btn cyan" type="submit">Generuj film</button></div>
   </form>`, { wide: true });
   pickStyle(lsGet('tss-style') || '');
+  loadSubskills().then(list => {
+    const box = $('[data-gen-subs]'); const on = list.filter(x => x.enabled);
+    if (!box || !on.length) return;
+    box.innerHTML = `<fieldset class="subs"><legend>Dodatki do generatora</legend>${on.map(x => `<label class="check"><input type="checkbox" name="subskill" value="${x.id}" ${x.default_on ? 'checked' : ''}> <span><b>${esc(x.name)}</b> <small>${esc(x.body.slice(0, 90))}</small></span></label>`).join('')}</fieldset>`;
+  }).catch(() => {});
 }
 
 // ---- visual style picker: every style shows a real example clip, so the choice is not blind ----
@@ -716,6 +769,98 @@ function playModal(v) {
     <div class="foot"><a class="btn ghost" href="/api/videos/${v.id}/download">Pobierz MP4</a>${v.posted ? '' : `<button class="btn" data-act="schedule" data-id="${v.id}">${v.next_slot ? 'Przesuń publikację' : 'Zaplanuj publikację'}</button>`}<button class="btn ghost" data-act="close">Zamknij</button></div>`, { wide: true });
 }
 
+// ---- music library: favourites go under the generated videos ---------------------------------------------------
+const fmtSec = (x) => { x = Math.round(x || 0); return `${Math.floor(x / 60)}:${String(x % 60).padStart(2, '0')}`; };
+async function viewMusic() {
+  const tab = S.mtab || 'all';
+  const r = await api('GET', `/api/music?filter=${tab}`);
+  const st = r.settings;
+  const tabs = [['all', 'Wszystkie'], ['fav', 'Ulubione'], ['trending', 'Trendy z TikToka'], ['mine', 'Moje'], ['ai', 'Wybrane przez AI']];
+  $('#view').innerHTML = `
+  <div class="head"><div><h1>Muzyka</h1><p>Ulubione utwory agent kładzie pod lektora (cicho, przycięte do długości filmu). Bez ulubionych film idzie bez muzyki.</p></div>
+    <div class="actions"><label class="btn" style="cursor:pointer">Wgraj plik audio<input type="file" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac" data-act-change="music-file" class="sr"></label></div></div>
+  <div class="grid2" style="margin-bottom:18px">
+    <section class="panel"><h2>Dodaj z linku</h2>
+      <form data-form="music-link" novalidate>${field('Link do utworu', inp('url', '', 'type="url" placeholder="TikTok, YouTube, SoundCloud albo plik .mp3"'), st.ytdlp ? 'Pobierzemy samo audio (do 60 MB).' : 'Na serwerze brakuje yt-dlp, działa tylko bezpośredni link do pliku.')}
+      <div class="err-inline" data-err></div><button class="btn ghost" type="submit">Dodaj utwór</button></form>
+    </section>
+    <section class="panel"><h2>Trendy i kurator AI</h2>
+      <p style="margin-top:0;font-size:14px;color:var(--slate)">${st.last_refresh ? `Ostatnie trendy: ${esc(fmtSlot(st.last_refresh))}. ` : ''}${st.last_ai ? `Kurator AI: ${esc(fmtSlot(st.last_ai))}.` : ''}${st.last_error ? `<br><span style="color:var(--bad)">Ostatni błąd: ${esc(st.last_error)}</span>` : ''}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn sm ghost" data-act="music-trends" ${st.apify ? '' : 'disabled'}>Pobierz trendy z TikToka</button>
+        <button class="btn sm ghost" data-act="music-ai" ${st.ai ? '' : 'disabled'}>Kurator AI: wybierz ulubione</button></div>
+      ${st.apify ? '' : '<small style="color:var(--slate)">Trendy wymagają klucza APIFY_API_TOKEN na serwerze.</small>'}
+      <details class="more" style="margin-top:12px"><summary>Automatycznie co rano</summary>
+        <form data-form="music-settings" novalidate>
+          <label class="check"><input type="checkbox" name="auto_trending" ${st.auto_trending ? 'checked' : ''} ${st.apify ? '' : 'disabled'}> <span>Pobieraj trendy z TikToka codziennie</span></label>
+          <label class="check"><input type="checkbox" name="auto_ai" ${st.auto_ai ? 'checked' : ''}> <span>Kurator AI codziennie dobiera ulubione</span></label>
+          <div class="fgrid">${field('Hashtagi trendów', inp('hashtags', st.hashtags, 'maxlength="200"'))}${field('Ile dźwięków', `<input class="i" name="limit" type="number" min="5" max="50" value="${st.limit}">`)}</div>
+          <div class="err-inline" data-err></div><button class="btn sm" type="submit">Zapisz</button></form></details>
+    </section>
+  </div>
+  <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" aria-selected="${tab === k}" class="${tab === k ? 'on' : ''}" data-act="mtab" data-arg="${k}">${l}</button>`).join('')}</div>
+  <section class="panel"><div class="rows">${r.music.map(m => `<div class="rowi">
+      <button class="btn sm ${m.favorite ? 'cyan' : 'ghost'}" data-act="music-fav" data-id="${m.id}" data-on="${m.favorite ? 1 : 0}" aria-pressed="${Boolean(m.favorite)}" title="${m.favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}">${m.favorite ? 'Ulubiony' : 'Do ulubionych'}</button>
+      <div class="main"><b>${esc(m.title)}</b><small>${esc([m.author, fmtSec(m.duration), m.mood].filter(Boolean).join(' · '))}
+        ${m.trend_rank ? ` <span class="pill planned">trend #${m.trend_rank}, ${m.trend_uses} filmów</span>` : ''}${m.source === 'trending' ? ` <span class="pill">${m.original ? 'original sound' : 'piosenka, prawa autorskie'}</span>` : ''}${m.added_by === 'ai' ? ' <span class="pill posted">AI</span>' : ''}</small>
+        ${m.note ? `<small style="display:block">${esc(m.note)}</small>` : ''}</div>
+      ${m.has_file ? `<audio controls preload="none" src="/api/music/${m.id}/file" style="height:34px;max-width:260px"></audio>` : ''}
+      <div class="acts"><button class="btn sm danger" data-act="music-del" data-id="${m.id}">Usuń</button></div></div>`).join('')
+    || `<div class="empty">Brak utworów w tym widoku. Wgraj plik, dodaj link${st.apify ? ' albo pobierz trendy z TikToka' : ''}.</div>`}</div></section>`;
+}
+
+// ---- inspiration: TikToks that work, broken down and remixed --------------------------------------------------
+let inspirePoll = null;
+async function viewInspire() {
+  const tab = S.itab || 'all';
+  const r = await api('GET', `/api/inspire?filter=${tab}`);
+  const tabs = [['all', 'Wszystkie'], ['ready', 'Przeanalizowane'], ['work', 'W trakcie i błędy']];
+  $('#view').innerHTML = `
+  <div class="head"><div><h1>Inspiracje</h1><p>Znajdź TikToki, które działają w Twojej niszy, rozbierz je na części (hook, montaż, psychologia) i zrób remiks na swój temat.</p></div></div>
+  ${r.apify ? '' : '<div class="empty" style="margin-bottom:18px">Wyszukiwanie TikToków wymaga klucza APIFY_API_TOKEN na serwerze. Administrator musi go dodać.</div>'}
+  <section class="panel" style="margin-bottom:18px"><form data-form="inspire-search" novalidate><div class="fgrid">
+    ${field('Temat albo fraza', inp('query', S.iquery || '', 'required maxlength="120" placeholder="np. jak się uczyć do egzaminu" ' + (r.apify ? '' : 'disabled')), '', 'full')}
+    ${field('Sortuj', '<select class="i" name="sort"><option value="LIKES">Najwięcej polubień</option><option value="PLAYS">Najwięcej wyświetleń</option><option value="RELEVANCE">Trafność</option></select>')}
+    ${field('Z okresu', '<select class="i" name="date"><option value="LAST_6_MONTHS">Ostatnie 6 miesięcy</option><option value="LAST_3_MONTHS">3 miesiące</option><option value="THIS_MONTH">Ten miesiąc</option><option value="THIS_WEEK">Ten tydzień</option><option value="ALL">Dowolnie</option></select>')}
+  </div><div class="err-inline" data-err></div><button class="btn cyan" type="submit" ${r.apify ? '' : 'disabled'}>Szukaj TikToków</button> <small style="color:var(--slate)">Szukanie trwa do 2-3 minut.</small></form></section>
+  <section class="panel" style="margin-bottom:18px"><form data-form="inspire-link" novalidate>${field('Albo wklej link do konkretnego TikToka', inp('url', '', 'type="url" placeholder="https://www.tiktok.com/@konto/video/..."'), 'Pobierzemy film i od razu zrobimy analizę. Działa bez wyszukiwarki.')}
+    <div class="err-inline" data-err></div><button class="btn ghost" type="submit">Analizuj ten film</button></form></section>
+  <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" aria-selected="${tab === k}" class="${tab === k ? 'on' : ''}" data-act="itab" data-arg="${k}">${l}</button>`).join('')}</div>
+  <div class="icards">${r.items.map(inspireCard).join('') || '<div class="empty">Brak filmów. Wyszukaj temat powyżej.</div>'}</div>`;
+  clearInterval(inspirePoll);
+  if (r.items.some(i => ['downloading', 'analyzing'].includes(i.status))) {
+    inspirePoll = setInterval(() => { if (location.pathname === '/app/inspiracje' && !$('#overlay').classList.contains('show')) viewInspire(); else clearInterval(inspirePoll); }, 6000);
+  }
+}
+function inspireCard(i) {
+  const working = ['downloading', 'analyzing'].includes(i.status);
+  return `<article class="icard">
+    <div class="icover">${i.cover ? `<img src="${esc(i.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}<span>${fmtSec(i.duration)}</span></div>
+    <div class="ibody"><b>@${esc(i.author)}</b><small>${fmtN(i.plays)} wyświetleń · ${fmtN(i.likes)} polubień · ${fmtN(i.comments)} kom.</small>
+      <p>${esc(String(i.descr || '').slice(0, 140))}</p>
+      ${i.status === 'ready' ? '<span class="pill posted">Przeanalizowany</span>' : working ? `<span class="pill planned"><span class="spin sm"></span> ${esc(i.step || 'Analiza')}</span>` : i.status === 'error' ? `<span class="pill late" title="${esc(i.error)}">Błąd: ${esc(String(i.error).slice(0, 60))}</span>` : ''}
+      <div class="iacts">
+        ${i.status === 'ready' ? `<button class="btn sm" data-act="ins-open" data-id="${i.id}">Analiza i remiks</button>` : `<button class="btn sm cyan" data-act="ins-bd" data-id="${i.id}" ${working ? 'disabled' : ''}>${i.status === 'error' ? 'Analizuj ponownie' : 'Analizuj'}</button>`}
+        <a class="btn sm ghost" href="${esc(i.url)}" target="_blank" rel="noopener noreferrer">TikTok</a>
+        <button class="btn sm danger" data-act="ins-del" data-id="${i.id}">Usuń</button></div></div></article>`;
+}
+async function inspireModal(id) {
+  const { item: i } = await api('GET', `/api/inspire/${id}`);
+  openModal(`<h2 id="modal-title">Analiza: @${esc(i.author)}</h2>
+    <p class="sub">${fmtN(i.plays)} wyświetleń, ${fmtN(i.likes)} polubień, ${i.shots.length} ujęć. <a href="${esc(i.url)}" target="_blank" rel="noopener noreferrer">Otwórz na TikToku</a></p>
+    ${i.frames.length ? `<div class="iframes">${i.frames.map(f => `<img src="/api/inspire/${i.id}/frame/${esc(f)}" alt="${esc(f)}" loading="lazy">`).join('')}</div>` : ''}
+    <section class="panel" style="margin:12px 0"><h2>Zrób remiks</h2>
+      <form data-form="inspire-remix" data-id="${i.id}" novalidate>
+        ${field('Nasz temat', inp('topic', '', 'maxlength="200" placeholder="Puste = agent dobierze temat do konta"'))}
+        ${field('Hook (opcjonalnie)', inp('hook', '', 'maxlength="300"'))}
+        ${channelSelect()}
+        <div class="err-inline" data-err></div><button class="btn cyan" type="submit">Dodaj remiks do pomysłów</button>
+        <small style="color:var(--slate);display:block;margin-top:6px">Generator dostanie całą analizę i klatki. Kopiuje mechanikę, nie treść.</small></form></section>
+    <div class="mdbox">${md(i.breakdown)}</div>
+    <details class="more"><summary>Transkrypcja</summary><pre class="code">${esc(i.transcript)}</pre></details>
+    <div class="foot"><button class="btn ghost" data-act="close">Zamknij</button></div>`, { wide: true });
+}
+
 // ---- agent tab: one instruction runs the whole studio -------------------------------------------------------
 const AGENT_EXAMPLES = [
   'Dodaj serię 20 filmów o tym, dlaczego niebo jest niebieskie, i wyrenderuj je wszystkie.',
@@ -743,9 +888,18 @@ async function viewAgent() {
 /** Minimal, safe Markdown for agent replies: escape first, then bold, italics, code, headings and lists. */
 function md(text) {
   const inline = (t) => t.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>').replace(/`([^`]+)`/g, '<code>$1</code>');
-  const out = []; let list = null;
+  const out = []; let list = null; let table = null;
+  const flushTable = () => { if (!table) return; out.push(`<table>${table.map((r, i) => `<tr>${r.map(c => `<${i ? 'td' : 'th'}>${inline(c)}</${i ? 'td' : 'th'}>`).join('')}</tr>`).join('')}</table>`); table = null; };
   for (const raw of esc(text).split('\n')) {
     const line = raw.trimEnd();
+    // markdown tables (analysis timelines): | a | b |, separator rows skipped
+    if (/^\s*\|.*\|\s*$/.test(line)) {
+      if (list) { out.push(`</${list}>`); list = null; }
+      if (/^\s*\|[\s:|-]+\|\s*$/.test(line)) continue;
+      (table = table || []).push(line.trim().slice(1, -1).split('|').map(c => c.trim()));
+      continue;
+    }
+    flushTable();
     const ul = line.match(/^\s*[-*•]\s+(.*)$/), ol = line.match(/^\s*(\d+)[.)]\s+(.*)$/);
     if (ul || ol) {
       const tag = ul ? 'ul' : 'ol';
@@ -760,6 +914,7 @@ function md(text) {
     else if (line.trim()) out.push(`<p>${inline(line)}</p>`);
   }
   if (list) out.push(`</${list}>`);
+  flushTable();
   return out.join('');
 }
 function chatMsg(m) {
@@ -1028,6 +1183,17 @@ const ACT = {
     toast(r.dry ? `Tryb testowy: mail do ${r.to} zapisany w logu serwera, nie wysłany.` : `Wysłano na ${r.to}`);
   }),
   'edit-channel': (el) => channelModal(S.me.channels.find(c => c.id === Number(el.dataset.id))),
+  'sub-edit': async (el) => subskillModal(el.dataset.id ? (S.subskills || await loadSubskills()).find(x => x.id === Number(el.dataset.id)) : null),
+  'sub-del': async (el) => { if (!(await ask('Usunąć ten dodatek do generatora?'))) return; await busy(el, async () => { await api('DELETE', `/api/subskills/${el.dataset.id}`); toast('Usunięto'); await repaint(); }); },
+  mtab: (el) => { S.mtab = el.dataset.arg; viewMusic(); },
+  'music-fav': (el) => busy(el, async () => { await api('PUT', `/api/music/${el.dataset.id}`, { favorite: el.dataset.on !== '1' }); await viewMusic(); }),
+  'music-del': async (el) => { if (!(await ask('Usunąć ten utwór z biblioteki?'))) return; await busy(el, async () => { await api('DELETE', `/api/music/${el.dataset.id}`); toast('Usunięto'); await viewMusic(); }); },
+  'music-trends': (el) => busy(el, async () => { toast('Pobieram trendy z TikToka, to potrwa do kilku minut'); const r = await api('POST', '/api/music/trending/refresh'); toast(`Trendy: ${r.top} dźwięków, nowych ${r.added}`); await viewMusic(); }),
+  'music-ai': (el) => busy(el, async () => { const r = await api('POST', '/api/music/ai-curate'); toast(r.picked.length ? `Kurator AI dodał do ulubionych: ${r.picked.length}` : 'Kurator AI nie znalazł nic nowego'); await viewMusic(); }),
+  itab: (el) => { S.itab = el.dataset.arg; viewInspire(); },
+  'ins-bd': (el) => busy(el, async () => { await api('POST', `/api/inspire/${el.dataset.id}/breakdown`); toast('Analiza ruszyła: pobieram film, klatki i transkrypcję'); await viewInspire(); }),
+  'ins-open': (el) => busy(el, () => inspireModal(el.dataset.id)),
+  'ins-del': async (el) => { if (!(await ask('Usunąć ten film z biblioteki inspiracji?'))) return; await busy(el, async () => { await api('DELETE', `/api/inspire/${el.dataset.id}`); toast('Usunięto'); await viewInspire(); }); },
   'del-channel': async (el) => {
     const c = S.me.channels.find(x => x.id === Number(el.dataset.id));
     if (!(await ask(`Usunąć kanał "${c.name}"? Jego filmy zostaną w Studio bez przypisanego kanału.`))) return;
@@ -1112,7 +1278,8 @@ const FORMS = {
     }
     const r = await api('POST', '/api/generate', { attachment_id, topic: d.topic, hook: d.hook, notes: d.notes, model: d.model,
       length_sec: Number(d.length_sec) || undefined, voice: d.voice, script: d.script, format: d.format, start: d.start,
-      style: f.querySelector('input[name=style]:checked')?.value || undefined, broll: Boolean(f.broll?.checked),
+      style: f.querySelector('input[name=style]:checked')?.value || undefined, broll: Boolean(f.broll?.checked), research: Boolean(f.research?.checked),
+      subskills: $$('input[name=subskill]:checked', f).map(x => Number(x.value)),
       queue_id: f.dataset.queue ? Number(f.dataset.queue) : undefined, channel_id: d.channel_id || S.channel || undefined });
     await loadData(); renderChrome();
     if (d.start) { toast('Generator przyjął zadanie'); jobModal(r.job_id); pollJobs(); }
@@ -1130,16 +1297,51 @@ const FORMS = {
     }
     closeModal(); await repaint();
   },
+  async 'music-link'(f, d) {
+    if (!d.url) { f.url.focus(); throw new Error('Wklej link.'); }
+    toast('Pobieram audio, to może potrwać minutę');
+    await api('POST', '/api/music/link', { url: d.url });
+    toast('Utwór dodany do ulubionych'); await viewMusic();
+  },
+  async 'music-settings'(f, d) {
+    await api('PUT', '/api/music/settings', { auto_trending: Boolean(f.auto_trending.checked), auto_ai: Boolean(f.auto_ai.checked), hashtags: d.hashtags, limit: Number(d.limit) });
+    toast('Zapisano');
+  },
+  async 'inspire-search'(f, d) {
+    req(f, 'query', 'Wpisz temat.');
+    S.iquery = d.query;
+    const r = await api('POST', '/api/inspire/search', { query: d.query, sort: d.sort, date: d.date });
+    toast(r.items.length ? `Znaleziono ${r.items.length} filmów` : 'Nic nie znaleziono, spróbuj innej frazy');
+    S.itab = 'all'; await viewInspire();
+  },
+  async 'inspire-link'(f, d) {
+    if (!d.url) { f.url.focus(); throw new Error('Wklej link do TikToka.'); }
+    await api('POST', '/api/inspire/link', { url: d.url });
+    toast('Film dodany, analiza ruszyła'); S.itab = 'all'; await viewInspire();
+  },
+  async 'inspire-remix'(f, d) {
+    const r = await api('POST', `/api/inspire/${f.dataset.id}/remix`, { topic: d.topic, hook: d.hook, channel_id: d.channel_id || S.channel || undefined });
+    closeModal(); toast('Remiks dodany do pomysłów'); await loadData(); renderChrome();
+    return r;
+  },
+  async subskill(f, d) {
+    req(f, 'name', 'Podaj nazwę dodatku.');
+    const body = { name: d.name, body: d.body, default_on: Boolean(f.default_on.checked), enabled: Boolean(f.enabled.checked) };
+    if (f.dataset.id) await api('PUT', `/api/subskills/${f.dataset.id}`, body); else await api('POST', '/api/subskills', body);
+    closeModal(); toast('Dodatek zapisany'); await repaint();
+  },
   async stats(f, d) {
     const body = { posted: 1, publish_date: d.publish_date, notes: d.notes };
-    for (const k of ['views', 'avg_watch', 'completion', 'likes', 'comments', 'shares', 'saves', 'followers']) {
+    const PCT = ['completion', 'src_fyp', 'src_profile', 'src_following', 'src_search', 'src_sound', 'new_viewers', 'returning_viewers'];
+    for (const k of ['views', 'avg_watch', 'completion', 'likes', 'comments', 'shares', 'saves', 'followers', 'total_watch_time', 'reached', 'profile_views', ...PCT.slice(1)]) {
       const val = humanNum(d[k]);
       if (val !== undefined) {
         if (Number.isNaN(val)) { f.querySelector(`[name=${k}]`).focus(); throw new Error('Nie rozpoznaję tej liczby. Wpisz np. 12500, 12,5 tys. albo 6,4.'); }
-        if (k === 'completion' && Number(val) > 100) { f.querySelector('[name=completion]').focus(); throw new Error('Procent obejrzeń do końca nie może przekroczyć 100.'); }
+        if (PCT.includes(k) && Number(val) > 100) { f.querySelector(`[name=${k}]`).focus(); throw new Error('Procent nie może przekroczyć 100.'); }
         body[k] = val;
       }
     }
+    if (d.retention_curve !== undefined) body.retention_curve = d.retention_curve;
     await api('PUT', `/api/videos/${f.dataset.id}/stats`, body);
     closeModal(); toast('Wyniki zapisane'); await repaint();
   },
@@ -1181,7 +1383,7 @@ const FORMS = {
   async channel(f, d) {
     req(f, 'name', 'Podaj nazwę kanału.');
     if (f.dataset.id) await api('PUT', `/api/channels/${f.dataset.id}`, d); else await api('POST', '/api/channels', d);
-    closeModal(); toast('Kanał zapisany'); await repaint();
+    closeModal(); toast('Konto zapisane'); await repaint();
   },
   async password(f, d) {
     if (!d.current) { f.current.focus(); throw new Error('Wpisz obecne hasło.'); }
@@ -1283,6 +1485,7 @@ document.addEventListener('change', async (e) => {
   }
   if (e.target.name === 'style' && e.target.closest('.stylepick')) { lsSet('tss-style', e.target.value); pickStyle(e.target.value); return; }
   if (e.target.name === 'broll' && e.target.closest('form[data-form=gen]')) lsSet('tss-broll', e.target.checked ? '1' : '0');
+  if (e.target.name === 'research' && e.target.closest('form[data-form=gen]')) lsSet('tss-research', e.target.checked ? '1' : '0');
   if (e.target.name === 'format' && e.target.closest('form[data-form=gen]')) {
     const wide = e.target.value === 'long_wide';
     $$('.sp-card[data-vonly]').forEach(c => { c.classList.toggle('off', wide); c.querySelector('input').disabled = wide; });
@@ -1294,6 +1497,20 @@ document.addEventListener('change', async (e) => {
     if (nt) { nt.hidden = e.target.value !== 'new'; if (!nt.hidden) nt.querySelector('input').focus(); }
   }
   if (e.target.matches('input[type=time]')) $$('[data-chips] button', e.target.closest('form')).forEach(b => b.classList.toggle('on', b.dataset.v === e.target.value));
+  if (e.target.dataset.actChange === 'music-file') {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 40 * 1024 * 1024) return toast('Plik jest za duży (max 40 MB).', true);
+    try {
+      toast('Wgrywam utwór');
+      const up = await fetch(`/api/music/upload?name=${encodeURIComponent(file.name)}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', 'X-Requested-With': 'fetch' }, body: file });
+      const j = await up.json().catch(() => ({}));
+      if (!up.ok || !j.ok) throw new Error(j.error || 'Nie udało się wgrać pliku.');
+      toast('Utwór dodany do ulubionych'); await viewMusic();
+    } catch (err) { toast(err.message, true); }
+    return;
+  }
   if (e.target.dataset.actChange === 'csv') {
     const file = e.target.files[0];
     e.target.value = '';

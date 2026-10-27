@@ -13,9 +13,12 @@ import { sendMail, emailShell, esc, mailerReady } from './mailer.js';
 import { startScheduler, buildDailyDigest, buildWeeklyReport, localParts } from './scheduler.js';
 import { parseSetup, cleanSetup, aiReady, MODELS, DEFAULT_MODEL } from './ai.js';
 import { zonedToUtc, validTimezone, csvToVideos } from './importers.js';
+import { listMusic, musicSettings, saveMusicSettings, addMusicFile, addMusicLink, updateMusic, deleteMusic, getMusic, refreshTrending, aiCurate } from './music.js';
+import { addByLink, listLibrary, searchTikToks, getItem as getInspire, startBreakdown, remixToQueue, deleteItem as deleteInspire, framePath } from './inspire.js';
+import { apifyReady } from './services.js';
 import { generatorStatus, styleList, createJob, cancelJob, startHeld, listJobs, jobForWorkspace, usedToday, recoverJobs, estimateMinutes, PHASES, DAILY_LIMIT, MODELS as GEN_MODELS, DEFAULT_MODEL as GEN_DEFAULT } from './generator.js';
 import { chat as agentChat, history as agentHistory, clearHistory as clearAgentHistory, AGENT_MODEL } from './marketing-agent.js';
-import { existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, rmSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -27,7 +30,7 @@ app.set('trust proxy', 1);
 
 app.use((req, res, next) => {
   res.set({
-    'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://*.tiktokcdn-eu.com https://*.ibyteimg.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
     'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'DENY',
   });
   if (process.env.NODE_ENV === 'production') res.set('Strict-Transport-Security', 'max-age=31536000');
@@ -224,6 +227,7 @@ function channelExtras(b, cur) {
     colors: has('colors') ? s(b.colors, 200) : (cur.colors || ''), voice: VOICES.includes(voice) ? voice : 'Puck',
     language: has('language') ? (s(b.language, 30) || 'polski') : (cur.language || 'polski'),
     length_sec: Number.isFinite(len) ? Math.min(90, Math.max(20, len)) : 40,
+    color: has('color') && /^#[0-9a-f]{6}$/i.test(String(b.color)) ? String(b.color).toLowerCase() : (cur.color || '#22b8cf'),
   };
 }
 
@@ -233,8 +237,8 @@ app.post('/api/channels', wrap((req, res) => {
   const name = s(b.name, 80);
   if (!name) throw httpErr(400, 'Podaj nazwę kanału.');
   const x = channelExtras(b, {});
-  const r = db.prepare('INSERT INTO channels(workspace_id,name,handle,niche,audience,goal,product,cta,colors,voice,language,length_sec) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(req.ws.id, name, cleanHandle(b.handle), s(b.niche, 400), s(b.audience, 300), s(b.goal, 300), x.product, x.cta, x.colors, x.voice, x.language, x.length_sec);
+  const r = db.prepare('INSERT INTO channels(workspace_id,name,handle,niche,audience,goal,product,cta,colors,voice,language,length_sec,color) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .run(req.ws.id, name, cleanHandle(b.handle), s(b.niche, 400), s(b.audience, 300), s(b.goal, 300), x.product, x.cta, x.colors, x.voice, x.language, x.length_sec, x.color);
   ok(res, { channel: db.prepare('SELECT * FROM channels WHERE id=?').get(r.lastInsertRowid) });
 }));
 app.put('/api/channels/:id', wrap((req, res) => {
@@ -245,9 +249,9 @@ app.put('/api/channels/:id', wrap((req, res) => {
   const name = pick('name', 80);
   if (!name) throw httpErr(400, 'Nazwa kanału nie może być pusta.');
   const x = channelExtras(b, cur);
-  db.prepare('UPDATE channels SET name=?, handle=?, niche=?, audience=?, goal=?, product=?, cta=?, colors=?, voice=?, language=?, length_sec=? WHERE id=?')
+  db.prepare('UPDATE channels SET name=?, handle=?, niche=?, audience=?, goal=?, product=?, cta=?, colors=?, voice=?, language=?, length_sec=?, color=? WHERE id=?')
     .run(name, 'handle' in b ? cleanHandle(b.handle) : cur.handle, pick('niche', 400), pick('audience', 300), pick('goal', 300),
-      x.product, x.cta, x.colors, x.voice, x.language, x.length_sec, cur.id);
+      x.product, x.cta, x.colors, x.voice, x.language, x.length_sec, x.color, cur.id);
   ok(res);
 }));
 app.delete('/api/channels/:id', wrap((req, res) => {
@@ -263,6 +267,9 @@ const VIDEO_TEXT = { title: 200, hook: 300, topic: 120, visual: 120, voice: 120,
 // the local studio and existing generators post Polish field names; accept both
 const LEGACY = { name: 'title', temat: 'topic', wizual: 'visual', glos: 'voice', tempo: 'pace', cat: 'category', path: 'file_url' };
 const STAT_NUM = ['views', 'avg_watch', 'completion', 'likes', 'comments', 'shares', 'saves', 'followers'];
+// the rest of TikTok Studio's analytics screen; percentages are 0-100, watch time in seconds
+const STAT_EXTRA = ['total_watch_time', 'reached', 'profile_views', 'src_fyp', 'src_profile', 'src_following', 'src_search', 'src_sound', 'new_viewers', 'returning_viewers'];
+const STAT_PCT = ['src_fyp', 'src_profile', 'src_following', 'src_search', 'src_sound', 'new_viewers', 'returning_viewers'];
 
 function normalizeVideoBody(b = {}) {
   const out = {};
@@ -284,6 +291,16 @@ function writeStats(videoId, b = {}, tz) {
     if (k === 'completion') v = Math.min(100, v);
     if (!['avg_watch', 'completion'].includes(k)) v = Math.round(v);
     sets.push(`${k}=?`); vals.push(v);
+  }
+  for (const k of STAT_EXTRA) if (b[k] !== undefined && b[k] !== '') {
+    let v = pos(b[k]);
+    if (STAT_PCT.includes(k)) v = Math.min(100, v); else if (k !== 'total_watch_time') v = Math.round(v);
+    sets.push(`${k}=?`); vals.push(v);
+  }
+  // retention curve: "% still watching" at each second, as typed from TikTok Studio ("100, 82, 64, ...")
+  if (b.retention_curve !== undefined) {
+    const pts = String(b.retention_curve).split(/[\s,;]+/).map(Number).filter(n => Number.isFinite(n) && n >= 0 && n <= 100).slice(0, 600);
+    sets.push('retention_curve=?'); vals.push(pts.join(','));
   }
   if (b.notes !== undefined) { sets.push('notes=?'); vals.push(s(b.notes, 2000)); }
   if (b.posted !== undefined) { sets.push('posted=?'); vals.push(b.posted ? 1 : 0); }
@@ -404,6 +421,11 @@ app.post('/api/generate', requireUser, rateLimit('generate', 20, 3600_000), wrap
   if (style?.verticalOnly && opts.format === 'long_wide') throw httpErr(400, `Styl "${style.name}" jest tylko pionowy. Wybierz format pionowy albo inny styl.`);
   opts.style = style ? style.id : undefined;   // brak stylu = agent dobiera sam z katalogu
   opts.broll = b.broll === true || b.broll === 'true' || b.broll === 1;
+  opts.research = b.research === true;
+  if (Array.isArray(b.subskills)) {
+    const own = new Set(db.prepare('SELECT id FROM subskills WHERE workspace_id=? AND enabled=1').all(req.ws.id).map(r => r.id));
+    opts.subskills = b.subskills.map(Number).filter(id => own.has(id)).slice(0, 10);
+  }
   const id = createJob(req.ws, { topic, hook, notes, channelId: chId, queueId, model: s(b.model, 120), opts, start: b.start !== false });
   ok(res, { job_id: id });
 }));
@@ -441,6 +463,73 @@ app.post('/api/jobs/cancel-queued', requireUser, (req, res) => {
   const ids = db.prepare("SELECT id FROM gen_jobs WHERE workspace_id=? AND status IN ('held','queued')").all(req.ws.id).map(r => r.id);
   ok(res, { canceled: ids.filter(id => cancelJob(req.ws.id, id)).length });
 });
+
+// ---- music library (favourites go under the generated videos) ------------------------------------
+app.get('/api/music', (req, res) => ok(res, { music: listMusic(req.ws.id, String(req.query.filter || 'all')), settings: musicSettings(req.ws.id) }));
+app.post('/api/music/upload', requireUser, rateLimit('music-up', 60, 3600_000), express.raw({ type: () => true, limit: '40mb' }), wrap((req, res) => {
+  const name = String(req.query.name || 'utwor.mp3').replace(/[^\p{L}\p{N} ._()-]+/gu, '_').slice(0, 120);
+  const id = addMusicFile(req.ws.id, req.body, { filename: name, title: s(req.query.title, 120) });
+  ok(res, { id });
+}));
+app.post('/api/music/link', requireUser, rateLimit('music-link', 30, 3600_000), wrap(async (req, res) => {
+  ok(res, { id: await addMusicLink(req.ws.id, req.body?.url, { title: s(req.body?.title, 120) }) });
+}));
+app.post('/api/music/trending/refresh', requireUser, rateLimit('music-trend', 6, 3600_000), wrap(async (req, res) => ok(res, await refreshTrending(req.ws.id))));
+app.post('/api/music/ai-curate', requireUser, rateLimit('music-ai', 20, 3600_000), wrap(async (req, res) => ok(res, await aiCurate(req.ws.id))));
+app.put('/api/music/settings', requireUser, wrap((req, res) => ok(res, { settings: saveMusicSettings(req.ws.id, req.body || {}) })));
+app.put('/api/music/:id', wrap((req, res) => { if (!updateMusic(req.ws.id, int(req.params.id), req.body || {})) throw httpErr(404, 'Utwór nie istnieje.'); ok(res); }));
+app.delete('/api/music/:id', wrap((req, res) => { if (!deleteMusic(req.ws.id, int(req.params.id))) throw httpErr(404, 'Utwór nie istnieje.'); ok(res); }));
+app.get('/api/music/:id/file', wrap((req, res) => {
+  const m = getMusic(req.ws.id, int(req.params.id));
+  if (!m?.file || !existsSync(m.file)) throw httpErr(404, 'Brak pliku utworu.');
+  res.sendFile(m.file);
+}));
+
+// ---- inspiration: TikTok library, ultra breakdown, remix into the queue ------------------------------
+app.get('/api/inspire', (req, res) => ok(res, { items: listLibrary(req.ws.id, String(req.query.filter || 'all')), apify: apifyReady() }));
+app.post('/api/inspire/search', requireUser, rateLimit('inspire-search', 20, 3600_000), wrap(async (req, res) => {
+  ok(res, { items: await searchTikToks(req.ws.id, req.body || {}) });
+}));
+app.post('/api/inspire/link', requireUser, rateLimit('inspire-link', 30, 3600_000), wrap(async (req, res) => ok(res, { id: await addByLink(req.ws.id, req.body?.url) })));
+app.get('/api/inspire/:id', wrap((req, res) => {
+  const it = getInspire(req.ws.id, int(req.params.id));
+  if (!it) throw httpErr(404, 'Nie ma takiego filmu w bibliotece.');
+  const { dir, ...item } = it;
+  const frames = dir && existsSync(dir) ? readdirSync(dir).filter(f => /^(hook|sheet-\d+)\.jpg$/.test(f)).sort() : [];
+  ok(res, { item: { ...item, shots: item.shots ? JSON.parse(item.shots) : [], frames } });
+}));
+app.post('/api/inspire/:id/breakdown', requireUser, rateLimit('inspire-bd', 30, 3600_000), wrap((req, res) => { startBreakdown(req.ws.id, int(req.params.id)); ok(res); }));
+app.post('/api/inspire/:id/remix', requireUser, wrap((req, res) => ok(res, { queue_id: remixToQueue(req.ws.id, int(req.params.id), req.body || {}) })));
+app.delete('/api/inspire/:id', wrap((req, res) => { if (!deleteInspire(req.ws.id, int(req.params.id))) throw httpErr(404, 'Nie ma takiego filmu.'); ok(res); }));
+app.get('/api/inspire/:id/frame/:name', wrap((req, res) => {
+  const p = framePath(req.ws.id, int(req.params.id), String(req.params.name));
+  if (!p) throw httpErr(404, 'Brak klatki.');
+  res.sendFile(p);
+}));
+
+// ---- subskills: the user's own add-ons for the generator brief -------------------------------------
+app.get('/api/subskills', (req, res) => ok(res, { subskills: db.prepare('SELECT * FROM subskills WHERE workspace_id=? ORDER BY id').all(req.ws.id) }));
+app.post('/api/subskills', wrap((req, res) => {
+  const b = req.body || {};
+  if (!s(b.name, 80)) throw httpErr(400, 'Podaj nazwę dodatku.');
+  if (db.prepare('SELECT COUNT(*) n FROM subskills WHERE workspace_id=?').get(req.ws.id).n >= 50) throw httpErr(429, 'Maksymalnie 50 dodatków.');
+  const id = db.prepare('INSERT INTO subskills(workspace_id,name,body,enabled,default_on) VALUES(?,?,?,?,?)')
+    .run(req.ws.id, s(b.name, 80), s(b.body, 4000), b.enabled === false ? 0 : 1, b.default_on ? 1 : 0).lastInsertRowid;
+  ok(res, { id });
+}));
+app.put('/api/subskills/:id', wrap((req, res) => {
+  const cur = db.prepare('SELECT * FROM subskills WHERE id=? AND workspace_id=?').get(int(req.params.id), req.ws.id);
+  if (!cur) throw httpErr(404, 'Dodatek nie istnieje.');
+  const b = req.body || {};
+  db.prepare('UPDATE subskills SET name=?, body=?, enabled=?, default_on=? WHERE id=?').run(
+    'name' in b ? (s(b.name, 80) || cur.name) : cur.name, 'body' in b ? s(b.body, 4000) : cur.body,
+    'enabled' in b ? (b.enabled ? 1 : 0) : cur.enabled, 'default_on' in b ? (b.default_on ? 1 : 0) : cur.default_on, cur.id);
+  ok(res);
+}));
+app.delete('/api/subskills/:id', wrap((req, res) => {
+  if (!db.prepare('DELETE FROM subskills WHERE id=? AND workspace_id=?').run(int(req.params.id), req.ws.id).changes) throw httpErr(404, 'Dodatek nie istnieje.');
+  ok(res);
+}));
 
 // ---- agent (one instruction runs the whole studio) ----------------------------------------
 app.get('/api/agent', (req, res) => ok(res, { messages: agentHistory(req.ws.id), model: AGENT_MODEL }));

@@ -186,6 +186,29 @@ ensureColumns('channels', [
 ensureColumns('videos', [['media_path', "TEXT DEFAULT ''"]]);
 ensureColumns('gen_jobs', [['opts', "TEXT DEFAULT ''"], ['queued_at', 'TEXT']]);   // opts JSON: per-film overrides; queued_at: when it entered the live queue (held jobs wait for a start)
 ensureColumns('videos', [['format', "TEXT DEFAULT 'short'"]]);   // short | long_vertical | long_wide   // JSON: per-film overrides (length, voice, own script)   // a rendered file the Studio stores itself
+ensureColumns('channels', [['color', "TEXT DEFAULT '#22b8cf'"]]);   // accent of the TikTok account in the switcher and lists
+ensureColumns('queue', [['remix_id', 'INTEGER']]);                  // tiktok_lib row this topic remixes (Inspiracje)
+// the full TikTok Studio analytics screen of a video (as in the local studio), not only the basics
+ensureColumns('stats', [
+  ['total_watch_time', 'REAL DEFAULT 0'], ['reached', 'INTEGER DEFAULT 0'], ['profile_views', 'INTEGER DEFAULT 0'],
+  ['src_fyp', 'REAL DEFAULT 0'], ['src_profile', 'REAL DEFAULT 0'], ['src_following', 'REAL DEFAULT 0'],
+  ['src_search', 'REAL DEFAULT 0'], ['src_sound', 'REAL DEFAULT 0'],
+  ['new_viewers', 'REAL DEFAULT 0'], ['returning_viewers', 'REAL DEFAULT 0'], ['retention_curve', "TEXT DEFAULT ''"],
+]);
+
+// prompt fragments the user can switch on in the generate dialog (local studio "subskills")
+db.exec(`
+CREATE TABLE IF NOT EXISTS subskills (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id  INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  name          TEXT NOT NULL,
+  body          TEXT DEFAULT '',
+  enabled       INTEGER DEFAULT 1,
+  default_on    INTEGER DEFAULT 0,
+  created_at    TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_subskills_ws ON subskills(workspace_id);
+`);
 
 // files a user attaches to a generation (PDF source material); text is extracted on upload
 db.exec(`
@@ -210,6 +233,10 @@ export function listVideos(wsId, channelId) {
       COALESCE(s.views,0) views, COALESCE(s.avg_watch,0) avg_watch, COALESCE(s.completion,0) completion,
       COALESCE(s.likes,0) likes, COALESCE(s.comments,0) comments, COALESCE(s.shares,0) shares,
       COALESCE(s.saves,0) saves, COALESCE(s.followers,0) followers, COALESCE(s.notes,'') notes,
+      COALESCE(s.total_watch_time,0) total_watch_time, COALESCE(s.reached,0) reached, COALESCE(s.profile_views,0) profile_views,
+      COALESCE(s.src_fyp,0) src_fyp, COALESCE(s.src_profile,0) src_profile, COALESCE(s.src_following,0) src_following,
+      COALESCE(s.src_search,0) src_search, COALESCE(s.src_sound,0) src_sound,
+      COALESCE(s.new_viewers,0) new_viewers, COALESCE(s.returning_viewers,0) returning_viewers, COALESCE(s.retention_curve,'') retention_curve,
       (SELECT sc.scheduled_at FROM schedule sc WHERE sc.video_id = v.id AND sc.status = 'planned'
          ORDER BY sc.scheduled_at LIMIT 1) next_slot
     FROM videos v LEFT JOIN stats s ON s.video_id = v.id
