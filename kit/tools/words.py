@@ -46,5 +46,7 @@ if not W:
         import whisper
         r = whisper.load_model("base").transcribe(src, language="pl", word_timestamps=True, fp16=False)
         W = [{"w": w["word"].strip(), "s": round(w["start"], 3), "e": round(w["end"], 3)} for s in r["segments"] for w in s["words"]]
+# "start"/"end" też, bo tak czytają skrypty Biblii TikToka (kasyno.py --slowa)
+for w in W: w["start"], w["end"] = w["s"], w["e"]
 json.dump(W, open(out, "w"), ensure_ascii=False)
 print(len(W), "słów;", " ".join(f'{x["w"]}@{x["s"]}' for x in W[:40]))

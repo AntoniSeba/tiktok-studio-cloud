@@ -6,6 +6,7 @@ import { db, nowIso, listVideos } from './db.js';
 import { analyze } from './analysis.js';
 import { createJob, cancelJob, startHeld, generatorStatus, styleList, usedToday, DAILY_LIMIT, MAX_QUEUED, FORMATS, estimateMinutes } from './generator.js';
 import { zonedToUtc } from './importers.js';
+import { BIBLIA_IDS } from './biblia.js';
 import { localParts } from './scheduler.js';
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
@@ -84,6 +85,7 @@ const TOOLS = {
         queue_id: { type: 'integer' }, topic: { type: 'string' }, hook: { type: 'string' }, notes: { type: 'string' },
         format: { type: 'string', enum: ['short', 'long_vertical', 'long_wide'] }, length_sec: { type: 'integer', description: 'short 20-90, długie 120-600' },
         style: { type: 'string', description: 'id stylu wizualnego (list_styles)' }, broll: { type: 'boolean' },
+        biblia_off: { type: 'array', items: { type: 'string' }, description: `elementy Biblii TikToka do wyłączenia (domyślnie wszystkie włączone): ${BIBLIA_IDS.join(', ')}` },
       } } },
       channel_id: { type: 'integer' },
     } },
@@ -105,7 +107,7 @@ const TOOLS = {
           const st = styleList().find(x => x.id === it.style);
           if (st?.verticalOnly && format === 'long_wide') throw new Error(`styl ${st.id} jest tylko pionowy`);
           const id = createJob(ws, { topic: q.topic, hook: str(it.hook, 300) || q.hook, notes: str(it.notes, 2000) || q.notes,
-            channelId: ch?.id || null, queueId: q.id, opts: { format, length_sec: Number(it.length_sec) || undefined, style: st?.id, broll: it.broll === true }, start: a.start_now === true });
+            channelId: ch?.id || null, queueId: q.id, opts: { format, length_sec: Number(it.length_sec) || undefined, style: st?.id, broll: it.broll === true, biblia_off: Array.isArray(it.biblia_off) ? it.biblia_off.filter(x => BIBLIA_IDS.includes(x)) : undefined }, start: a.start_now === true });
           out.push({ job_id: id, queue_id: q.id, topic: q.topic, format, style: st?.name || 'dobiera generator' });
         } catch (e) { errors.push({ topic: it.topic || it.queue_id, error: e.message }); if (e.status === 429 || e.status === 503) break; }
       }

@@ -16,6 +16,7 @@ import { zonedToUtc, validTimezone, csvToVideos } from './importers.js';
 import { listMusic, musicSettings, saveMusicSettings, addMusicFile, addMusicLink, updateMusic, deleteMusic, getMusic, refreshTrending, aiCurate } from './music.js';
 import { addByLink, listLibrary, searchTikToks, getItem as getInspire, startBreakdown, remixToQueue, deleteItem as deleteInspire, framePath } from './inspire.js';
 import { apifyReady } from './services.js';
+import { BIBLIA_IDS } from './biblia.js';
 import { generatorStatus, styleList, createJob, cancelJob, startHeld, listJobs, jobForWorkspace, usedToday, recoverJobs, estimateMinutes, PHASES, DAILY_LIMIT, MODELS as GEN_MODELS, DEFAULT_MODEL as GEN_DEFAULT } from './generator.js';
 import { chat as agentChat, history as agentHistory, clearHistory as clearAgentHistory, AGENT_MODEL } from './marketing-agent.js';
 import { existsSync, rmSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs';
@@ -422,6 +423,7 @@ app.post('/api/generate', requireUser, rateLimit('generate', 20, 3600_000), wrap
   opts.style = style ? style.id : undefined;   // brak stylu = agent dobiera sam z katalogu
   opts.broll = b.broll === true || b.broll === 'true' || b.broll === 1;
   opts.research = b.research === true;
+  if (Array.isArray(b.biblia_off)) opts.biblia_off = b.biblia_off.filter(id => BIBLIA_IDS.includes(id));   // TikTok Bible elements switched off
   if (Array.isArray(b.subskills)) {
     const own = new Set(db.prepare('SELECT id FROM subskills WHERE workspace_id=? AND enabled=1').all(req.ws.id).map(r => r.id));
     opts.subskills = b.subskills.map(Number).filter(id => own.has(id)).slice(0, 10);

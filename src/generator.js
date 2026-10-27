@@ -14,6 +14,7 @@ import { localParts } from './scheduler.js';
 import { musicForJob } from './music.js';
 import { remixForJob, competitorBrief } from './inspire.js';
 import { apifyReady } from './services.js';
+import { bibliaOn, bibliaFill, bibliaList } from './biblia.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -82,7 +83,7 @@ const has = (cmd) => spawnSync('sh', ['-c', `command -v ${cmd}`], { stdio: 'igno
 let readyCache = null;
 /** What this host is missing to run the generator (empty list = ready). Cached; ?refresh re-checks. */
 export function generatorStatus(refresh = false) {
-  const withStyles = (r) => ({ ...r, styles: styleList().map(({ read, ...st }) => st), broll: brollAvailable(), research: apifyReady() });
+  const withStyles = (r) => ({ ...r, styles: styleList().map(({ read, ...st }) => st), broll: brollAvailable(), research: apifyReady(), biblia: bibliaList() });
   if (readyCache && !refresh) return withStyles(readyCache);
   const missing = [];
   if (process.env.GEN_ENABLED === '0') missing.push('generator wyłączony (GEN_ENABLED=0)');
@@ -321,6 +322,7 @@ export function buildPrompt(job) {
   const secs = Math.min(F.max, Math.max(F.min, Math.round(want)));
   const voices = ['Puck', 'Leda', 'Kore', 'Charon', 'Fenrir'];
   const voice = voices.includes(o.voice) ? o.voice : voices.includes(ch.voice) ? ch.voice : 'Puck';
+  const bib = bibliaOn(o.biblia_off, F.h > F.w);   // TikTok Bible elements the user left switched on
   const fill = {
     SECONDS: secs, WORDS: `${Math.round(secs * 3.4)}-${Math.round(secs * 3.75)}`, SEC_MIN: secs - 3, SEC_MAX: secs + 3,
     LANGUAGE: ch.language || 'polski', VOICE: voice, KIT, FORMAT_NAME: F.name, SIZE: `${F.w}x${F.h}`,
@@ -331,9 +333,10 @@ export function buildPrompt(job) {
         ? `Długi pionowy explainer (ok. ${Math.round(secs / 60)} min). Podziel go na kilka wyraźnych części; skrypt dziel na akapity (pusta linia) po ok. 120 słów, bo lektor nagrywa każdy akapit osobno.`
         : `Długi POZIOMY explainer 16:9 (1920x1080, ok. ${Math.round(secs / 60)} min) na YouTube. Build: W=1920 H=1080 python3 build.py. Podziel go na kilka wyraźnych części; skrypt w akapitach po ok. 120 słów.`,
     SAFE_NOTE: F.h > F.w
-      ? 'Kluczowe teksty i napisy poza interfejsem TikToka: nie w górnych 200 px, nie w dolnych 480 px i nie w prawym pasie x 940-1080 (wysokość 600-1440).'
+      ? (bib.has('strefy') ? 'Martwe strefy TikToka: zasada w Biblii wyżej.' : 'Kluczowe teksty co najmniej 60 px od krawędzi kadru.')
       : 'Margines bezpieczeństwa 80 px od krawędzi kadru.',
     CTA: ch.cta || 'zapisz film albo zrób zrzut planu i zacznij dziś',
+    ...bibliaFill(bib, { cta: ch.cta || 'zapisz film albo zrób zrzut planu i zacznij dziś' }),
     STYLE_BLOCK: styleBlock(o, fk),
     BROLL_BLOCK: brollBlock(o),
   };

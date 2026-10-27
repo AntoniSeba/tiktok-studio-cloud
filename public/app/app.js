@@ -672,6 +672,7 @@ function genModal(queueId) {
     ${field('Format', `<select class="i" name="format"><option value="short">TikTok pionowy (20-90 s)</option><option value="long_vertical">Długi pionowy (2-10 min)</option><option value="long_wide">Długi poziomy 16:9, YouTube (2-10 min)</option></select>`)}
     ${stylePicker(g)}
     <label class="check"><input type="checkbox" name="research" ${g.research ? '' : 'disabled'} ${g.research && lsGet('tss-research') === '1' ? 'checked' : ''}> <span>Research konkurencji przed startem: agent dostanie najmocniejsze TikToki na ten temat${g.research ? ' (ok. 1-2 min, Apify)' : '. Niedostępne: brak APIFY_API_TOKEN na serwerze'}</span></label>
+    ${bibliaPicker(g)}
     <div data-gen-subs></div>
     <label class="check"><input type="checkbox" name="broll" ${g.broll ? '' : 'disabled'} ${g.broll && lsGet('tss-broll') === '1' ? 'checked' : ''}> <span>Dorzuć prawdziwe ujęcia z internetu (b-roll z Pexels, darmowa licencja)${g.broll ? '' : '. Niedostępne: brak klucza PEXELS_API_KEY na serwerze'}</span></label>
     <details class="more"><summary>Opcje filmu: długość, lektor, własny skrypt</summary><div class="fgrid">
@@ -691,6 +692,25 @@ function genModal(queueId) {
     if (!box || !on.length) return;
     box.innerHTML = `<fieldset class="subs"><legend>Dodatki do generatora</legend>${on.map(x => `<label class="check"><input type="checkbox" name="subskill" value="${x.id}" ${x.default_on ? 'checked' : ''}> <span><b>${esc(x.name)}</b> <small>${esc(x.body.slice(0, 90))}</small></span></label>`).join('')}</fieldset>`;
   }).catch(() => {});
+}
+
+// ---- TikTok Bible: every element can be switched off for one film (remembered in the browser) ----
+function bibliaPicker(g) {
+  const list = g.biblia || [];
+  if (!list.length) return '';
+  let off = []; try { off = JSON.parse(lsGet('tss-biblia-off') || '[]'); } catch {}
+  const onCount = list.filter(b => !off.includes(b.id)).length;
+  return `<details class="more biblia" ${off.length ? 'open' : ''}><summary>Biblia TikToka: <span data-bib-count>${onCount} z ${list.length}</span> zasad włączonych</summary>
+    <p style="margin:0 0 8px;font-size:14px;color:var(--slate)">Standard z kanału o silnikach (49 filmów, 5,4 mln wyświetleń). Odznacz to, czego ten film ma nie robić.</p>
+    <div style="display:flex;gap:6px;margin-bottom:8px"><button type="button" class="btn sm ghost" data-act="bib-all" data-arg="1">Zaznacz wszystkie</button><button type="button" class="btn sm ghost" data-act="bib-all" data-arg="0">Odznacz wszystkie</button></div>
+    <div class="bib-grid">${list.map(b => `<label class="check"><input type="checkbox" name="biblia" value="${esc(b.id)}" ${off.includes(b.id) ? '' : 'checked'}> <span><b>${esc(b.name)}</b> <small>${esc(b.short)}</small></span></label>`).join('')}</div></details>`;
+}
+function bibliaSync(form) {
+  const all = $$('input[name=biblia]', form);
+  const off = all.filter(x => !x.checked).map(x => x.value);
+  lsSet('tss-biblia-off', JSON.stringify(off));
+  const c = $('[data-bib-count]', form); if (c) c.textContent = `${all.length - off.length} z ${all.length}`;
+  return off;
 }
 
 // ---- visual style picker: every style shows a real example clip, so the choice is not blind ----
@@ -1185,6 +1205,7 @@ const ACT = {
   'edit-channel': (el) => channelModal(S.me.channels.find(c => c.id === Number(el.dataset.id))),
   'sub-edit': async (el) => subskillModal(el.dataset.id ? (S.subskills || await loadSubskills()).find(x => x.id === Number(el.dataset.id)) : null),
   'sub-del': async (el) => { if (!(await ask('Usunąć ten dodatek do generatora?'))) return; await busy(el, async () => { await api('DELETE', `/api/subskills/${el.dataset.id}`); toast('Usunięto'); await repaint(); }); },
+  'bib-all': (el) => { const f = el.closest('form'); $$('input[name=biblia]', f).forEach(x => { x.checked = el.dataset.arg === '1'; }); bibliaSync(f); },
   mtab: (el) => { S.mtab = el.dataset.arg; viewMusic(); },
   'music-fav': (el) => busy(el, async () => { await api('PUT', `/api/music/${el.dataset.id}`, { favorite: el.dataset.on !== '1' }); await viewMusic(); }),
   'music-del': async (el) => { if (!(await ask('Usunąć ten utwór z biblioteki?'))) return; await busy(el, async () => { await api('DELETE', `/api/music/${el.dataset.id}`); toast('Usunięto'); await viewMusic(); }); },
@@ -1279,7 +1300,7 @@ const FORMS = {
     const r = await api('POST', '/api/generate', { attachment_id, topic: d.topic, hook: d.hook, notes: d.notes, model: d.model,
       length_sec: Number(d.length_sec) || undefined, voice: d.voice, script: d.script, format: d.format, start: d.start,
       style: f.querySelector('input[name=style]:checked')?.value || undefined, broll: Boolean(f.broll?.checked), research: Boolean(f.research?.checked),
-      subskills: $$('input[name=subskill]:checked', f).map(x => Number(x.value)),
+      subskills: $$('input[name=subskill]:checked', f).map(x => Number(x.value)), biblia_off: bibliaSync(f),
       queue_id: f.dataset.queue ? Number(f.dataset.queue) : undefined, channel_id: d.channel_id || S.channel || undefined });
     await loadData(); renderChrome();
     if (d.start) { toast('Generator przyjął zadanie'); jobModal(r.job_id); pollJobs(); }
@@ -1485,6 +1506,7 @@ document.addEventListener('change', async (e) => {
   }
   if (e.target.name === 'style' && e.target.closest('.stylepick')) { lsSet('tss-style', e.target.value); pickStyle(e.target.value); return; }
   if (e.target.name === 'broll' && e.target.closest('form[data-form=gen]')) lsSet('tss-broll', e.target.checked ? '1' : '0');
+  if (e.target.name === 'biblia' && e.target.closest('form[data-form=gen]')) { bibliaSync(e.target.closest('form')); return; }
   if (e.target.name === 'research' && e.target.closest('form[data-form=gen]')) lsSet('tss-research', e.target.checked ? '1' : '0');
   if (e.target.name === 'format' && e.target.closest('form[data-form=gen]')) {
     const wide = e.target.value === 'long_wide';

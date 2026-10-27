@@ -6,7 +6,7 @@
 FROM node:22-bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ffmpeg poppler-utils python3 python3-pip python3-numpy python3-pil python3-yaml python3-fonttools python3-brotli curl ca-certificates unzip \
+      ffmpeg poppler-utils python3 python3-pip python3-numpy python3-pil python3-yaml python3-fonttools python3-brotli tesseract-ocr curl ca-certificates unzip \
       fonts-dejavu-core libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 \
       libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 libpango-1.0-0 libcairo2 \
     && pip3 install --break-system-packages --no-cache-dir faster-whisper \
