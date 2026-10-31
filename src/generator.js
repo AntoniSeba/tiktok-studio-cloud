@@ -777,6 +777,8 @@ function agentEnv(job, dir, lib) {
     // headless Claude Code: local login (HOME keychain) or GEN_ANTHROPIC_API_KEY on a server
     const key = process.env.GEN_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
     if (key) env.ANTHROPIC_API_KEY = key;
+    // a Claude subscription on a server or in Docker (no keychain there): the token from `claude setup-token`
+    if (process.env.CLAUDE_CODE_OAUTH_TOKEN) env.CLAUDE_CODE_OAUTH_TOKEN = process.env.CLAUDE_CODE_OAUTH_TOKEN;
     // every turn re-sends the whole context: no claude.ai connectors (Gmail, Docs...) and no extra tools,
     // and a render may block for up to 15 min in one call instead of being polled turn after turn
     env.ENABLE_CLAUDEAI_MCP_SERVERS = 'false';
@@ -801,7 +803,7 @@ function spawnAgent(job, dir, lib, resumeSid, stage = 'motion') {
   let cmd = engine === 'claude' ? claudeBin() : opencodeBin(), rest = args, spawnEnv = env;
   if (SANDBOX === 'docker') {
     // same paths inside and outside, so the prompt and the files agree; kit is read-only
-    const pass = ['OPENROUTER_API_KEY', 'KIT', 'JOB', 'CUTOUT_LIBRARY', 'CUTOUT_FILM_BUDGET', ...(env.BASH_MAX_TIMEOUT_MS ? ['ENABLE_CLAUDEAI_MCP_SERVERS', 'BASH_DEFAULT_TIMEOUT_MS', 'BASH_MAX_TIMEOUT_MS'] : []), ...(env.ANTHROPIC_API_KEY ? ['ANTHROPIC_API_KEY'] : []), ...(env.PEXELS_API_KEY ? ['PEXELS_API_KEY'] : [])];
+    const pass = ['OPENROUTER_API_KEY', 'KIT', 'JOB', 'CUTOUT_LIBRARY', 'CUTOUT_FILM_BUDGET', ...(env.BASH_MAX_TIMEOUT_MS ? ['ENABLE_CLAUDEAI_MCP_SERVERS', 'BASH_DEFAULT_TIMEOUT_MS', 'BASH_MAX_TIMEOUT_MS'] : []), ...(env.ANTHROPIC_API_KEY ? ['ANTHROPIC_API_KEY'] : []), ...(env.CLAUDE_CODE_OAUTH_TOKEN ? ['CLAUDE_CODE_OAUTH_TOKEN'] : []), ...(env.PEXELS_API_KEY ? ['PEXELS_API_KEY'] : [])];
     rest = ['run', '--rm', '--name', `tsc-job-${job.id}`, '--memory', process.env.GEN_DOCKER_MEMORY || '2g', '--cpus', process.env.GEN_DOCKER_CPUS || '3',
       '--pids-limit', '512', '--security-opt', 'no-new-privileges',
       '-v', `${dir}:${dir}`, '-v', `${KIT}:${KIT}:ro`, '-v', `${lib}:${lib}`, '-w', dir,
