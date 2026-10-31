@@ -15,6 +15,7 @@ import { musicForJob } from './music.js';
 import { remixForJob, competitorBrief } from './inspire.js';
 import { apifyReady } from './services.js';
 import { bibliaOn, bibliaFill, bibliaList } from './biblia.js';
+import { BASE } from './basepath.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -114,8 +115,8 @@ export function styleList() {
     const m = JSON.parse(readFileSync(join(KIT, 'styles', 'styles.json'), 'utf8'));
     const prev = (id) => {
       const base = join(ROOT, 'public', 'styles', id);
-      return { video: existsSync(join(base, 'example.mp4')) ? `/styles/${id}/example.mp4` : null,
-               poster: existsSync(join(base, 'poster.jpg')) ? `/styles/${id}/poster.jpg` : null };
+      return { video: existsSync(join(base, 'example.mp4')) ? `${BASE}/styles/${id}/example.mp4` : null,
+               poster: existsSync(join(base, 'poster.jpg')) ? `${BASE}/styles/${id}/poster.jpg` : null };
     };
     for (const s of m.styles) out.push({ id: s.id, group: s.group, name: s.name, tagline: s.tagline, best_for: s.best_for, engine: s.engine,
       credit: s.credit, read: s.read.map(r => `styles/${s.id}/${r}`), ...prev(s.id) });

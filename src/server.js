@@ -19,6 +19,7 @@ import { apifyReady } from './services.js';
 import { BIBLIA_IDS } from './biblia.js';
 import { generatorStatus, styleList, createJob, cancelJob, resumeJob, retryJob, AGENTS, agentTemplate, agentDefault, startHeld, listJobs, jobForWorkspace, usedToday, recoverJobs, startLimitWatcher, estimateMinutes, PHASES, DAILY_LIMIT, GEN_DIR, MODELS as GEN_MODELS, DEFAULT_MODEL as GEN_DEFAULT } from './generator.js';
 import { chat as agentChat, history as agentHistory, clearHistory as clearAgentHistory, AGENT_MODEL } from './marketing-agent.js';
+import { basePath, BASE } from './basepath.js';
 import { existsSync, rmSync, mkdirSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -37,6 +38,8 @@ app.use((req, res, next) => {
   if (process.env.NODE_ENV === 'production') res.set('Strict-Transport-Security', 'max-age=31536000');
   next();
 });
+// BASE_PATH (e.g. /tts): the Studio lives under a prefix on a shared domain
+basePath(app, { '/assets': resolve(PUB, 'assets'), '/app/static': resolve(PUB, 'app') });
 app.use(express.json({ limit: '1mb' }));
 app.use(attachAuth);
 
@@ -95,7 +98,7 @@ app.post('/api/auth/register', rateLimit('register', 10, 3600_000), wrap((req, r
     return u.lastInsertRowid;
   })();
   createSession(res, userId);
-  ok(res, { next: '/app/start' });
+  ok(res, { next: BASE + '/app/start' });
 }));
 
 app.post('/api/auth/login', rateLimit('login', 20, 900_000), wrap((req, res) => {
@@ -104,7 +107,7 @@ app.post('/api/auth/login', rateLimit('login', 20, 900_000), wrap((req, res) => 
   if (!u || !verifyPassword(req.body?.password, u.pass_hash)) throw httpErr(401, 'Nieprawidłowy e-mail lub hasło.');
   createSession(res, u.id);
   const ws = db.prepare('SELECT onboarded_at FROM workspaces WHERE owner_id=?').get(u.id);
-  ok(res, { next: ws?.onboarded_at ? '/app' : '/app/start' });
+  ok(res, { next: BASE + (ws?.onboarded_at ? '/app' : '/app/start') });
 }));
 
 app.post('/api/auth/logout', (req, res) => { destroySession(req, res); ok(res); });
@@ -115,7 +118,7 @@ app.post('/api/auth/forgot', rateLimit('forgot', 5, 3600_000), wrap(async (req, 
   if (u) {
     const token = newToken();
     db.prepare('INSERT INTO password_resets(token_hash,user_id,expires_at) VALUES(?,?,?)').run(sha256(token), u.id, new Date(Date.now() + 3600_000).toISOString());
-    const base = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+    const base = process.env.APP_URL || `${req.protocol}://${req.get('host')}${BASE}`;
     const link = `${base}/reset-hasla?token=${token}`;
     await sendMail({ to: email, subject: 'Reset hasła do TikTok Studio', html: emailShell('Ustaw nowe hasło',
       `<p>Ktoś (pewnie Ty) poprosił o reset hasła. Link działa przez godzinę:</p><p><a href="${esc(link)}" style="color:#6a5cff;font-weight:700">${esc(link)}</a></p><p style="color:#7a7686">Jeśli to nie Ty, zignoruj tę wiadomość.</p>`) });

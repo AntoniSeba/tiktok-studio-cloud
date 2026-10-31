@@ -2,6 +2,7 @@
 // in-memory rate limiter. No third-party auth dependency on purpose.
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
 import { db, nowIso } from './db.js';
+import { BASE } from './basepath.js';
 
 const SESSION_DAYS = 30;
 export const COOKIE = 'tss_session';
@@ -40,13 +41,13 @@ export function createSession(res, userId) {
   const expires = new Date(Date.now() + SESSION_DAYS * 864e5);
   db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(sha256(token), userId, expires.toISOString());
   db.prepare('UPDATE users SET last_login_at=? WHERE id=?').run(nowIso(), userId);
-  res.cookie(COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: isProd(), expires, path: '/' });
+  res.cookie(COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: isProd(), expires, path: BASE || '/' });
 }
 
 export function destroySession(req, res) {
   const token = readCookie(req, COOKIE);
   if (token) db.prepare('DELETE FROM sessions WHERE token_hash=?').run(sha256(token));
-  res.clearCookie(COOKIE, { path: '/' });
+  res.clearCookie(COOKIE, { path: BASE || '/' });
 }
 
 function readCookie(req, name) {
