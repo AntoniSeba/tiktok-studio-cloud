@@ -227,7 +227,9 @@ export async function dailyMusicJob() {
  * Copies the favourites into the job folder (the agent sees nothing outside it) and returns
  * the brief block that lists them. No favourites = the video goes without music.
  */
-export function musicForJob(wsId, jobDir) {
+export function musicForJob(wsId, jobDir, wanted = false) {
+  const off = '# MUZYKA\n- Film idzie BEZ muzyki: zero utworów, podkładów i beatów, nie twórz project/assets/music.mp3. Tylko lektor i pojedyncze efekty dźwiękowe.';
+  if (!wanted) return off;   // music is opt-in per film
   const fav = db.prepare("SELECT id,title,author,mood,duration,original,source,file FROM music WHERE workspace_id=? AND favorite=1 AND file<>'' ORDER BY id DESC LIMIT 25")
     .all(wsId).filter(m => existsSync(m.file));
   const ban = '- Nie generuj muzyki: żadnej muzyki syntezowanej w kodzie (numpy, sox, WebAudio, ffmpeg sine), żadnych beatów z AI i nie pobieraj muzyki z sieci.';

@@ -222,10 +222,14 @@ export function remixForJob(wsId, queueId, jobDir) {
   if (!it || it.status !== 'ready' || !it.dir) return '';
   const dir = join(jobDir, 'remiks'); mkdirSync(dir, { recursive: true });
   for (const f of readdirSync(it.dir)) if (/^(hook|sheet-\d+)\.jpg$|^(BREAKDOWN\.md|transcript\.txt)$/.test(f)) copyFileSync(join(it.dir, f), join(dir, f));
+  // the agent reads this every turn from then on: only the verdict, the hook and the recipe (about a fifth of the analysis)
+  const bd = readFileSync(join(dir, 'BREAKDOWN.md'), 'utf8');
+  const parts = bd.split(/^(?=## )/m).filter(x => /^## (1|2|10)\./.test(x));
+  if (parts.length) writeFileSync(join(dir, 'PRZEPIS.md'), `# Przepis remiksu: ${it.url}\n\n` + parts.join('\n'));
   return [
     '# REMIKS (obowiązkowy szkielet filmu)',
     `Odtwórz IDENTYCZNĄ psychologię, strukturę beatów, tempo montażu, typ hooka i mechanikę retencji filmu ${it.url} (@${it.author}, ${it.plays} wyświetleń).`,
-    'Pełna analiza: remiks/BREAKDOWN.md (przeczytaj całą przed planem; sekcja 10 "PRZEPIS DO REMIKSU" to szkielet). Klatki: remiks/hook.jpg i remiks/sheet-*.jpg, transkrypcja: remiks/transcript.txt.',
+    'Przeczytaj remiks/PRZEPIS.md (werdykt, hook i przepis do remiksu: to szkielet filmu). Pełną analizę remiks/BREAKDOWN.md, klatki remiks/*.jpg i remiks/transcript.txt otwieraj tylko, jeśli czegoś konkretnego w przepisie brakuje (grep, nie cat).',
     'Temat, fakty, teksty, obraz i muzyka są NASZE: nie kopiuj niczego 1:1, kopiujesz tylko mechanikę. Styl wizualny i zasady z tego pliku nadal obowiązują.',
   ].join('\n');
 }

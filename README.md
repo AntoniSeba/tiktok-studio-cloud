@@ -29,6 +29,10 @@ To wielokontowa wersja lokalnego TikTok Studio (`../tiktok-studio`), z własnym 
 
 ## Uruchomienie lokalne
 
+Najprościej: otwórz Claude Code w folderze repo i napisz "zainstaluj". Claude przeczyta `INSTALL.md`, zainstaluje wszystkie programy i paczki, zapyta o klucze i uruchomi Studio na stałe. Stan instalacji: `bash scripts/doctor.sh`.
+
+Ręcznie:
+
 ```bash
 npm install
 cp .env.example .env    # uzupełnij OPENROUTER_API_KEY, opcjonalnie BREVO_*

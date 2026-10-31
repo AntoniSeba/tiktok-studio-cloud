@@ -5,7 +5,7 @@ const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 export const DEFAULT_MODEL = process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash-lite';
 // Models offered in the picker; override with OPENROUTER_MODELS="a,b,c".
 export const MODELS = (process.env.OPENROUTER_MODELS ||
-  'google/gemini-2.5-flash-lite,openai/gpt-5-nano,qwen/qwen3-235b-a22b-2507,deepseek/deepseek-v3.2,mistralai/mistral-small-3.2-24b-instruct')
+  'google/gemini-2.5-flash-lite,openai/gpt-5-nano,qwen/qwen3-235b-a22b-2507,deepseek/deepseek-v4.1-flash,deepseek/deepseek-v3.2,mistralai/mistral-small-3.2-24b-instruct')
   .split(',').map(s => s.trim()).filter(Boolean);
 if (!MODELS.includes(DEFAULT_MODEL)) MODELS.unshift(DEFAULT_MODEL);
 

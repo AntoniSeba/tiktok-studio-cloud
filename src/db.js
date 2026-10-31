@@ -188,6 +188,28 @@ ensureColumns('gen_jobs', [['opts', "TEXT DEFAULT ''"], ['queued_at', 'TEXT']]);
 ensureColumns('videos', [['format', "TEXT DEFAULT 'short'"]]);   // short | long_vertical | long_wide   // JSON: per-film overrides (length, voice, own script)   // a rendered file the Studio stores itself
 ensureColumns('channels', [['color', "TEXT DEFAULT '#22b8cf'"]]);   // accent of the TikTok account in the switcher and lists
 ensureColumns('queue', [['remix_id', 'INTEGER']]);                  // tiktok_lib row this topic remixes (Inspiracje)
+ensureColumns('queue', [['style', "TEXT DEFAULT ''"]]);
+ensureColumns('queue', [['length_sec', 'INTEGER DEFAULT 0']]);   // planned film length; 0 = channel default, over 90 s = long vertical   // visual style planned for this topic; the generate form starts from it
+ensureColumns('channels', [['product_info', "TEXT DEFAULT ''"]]);   // long product description the agent reads (features, price, what sets it apart)
+ensureColumns('channels', [['agent_kit', "TEXT DEFAULT ''"]]);   // kit/kanaly/<name>: the channel's own agent briefs (e.g. silniki: 3D engines); '' = workspace agents
+// real screenshots of the channel's product: the agent shows these instead of inventing an app UI
+db.exec(`CREATE TABLE IF NOT EXISTS channel_shots (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id  INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  channel_id    INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+  caption       TEXT DEFAULT '',
+  path          TEXT NOT NULL,
+  created_at    TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_shots_ch ON channel_shots(channel_id);`);
+// each account can rewrite the brief of any generator agent (writer, reviewer, first-frame designer, animator)
+db.exec(`CREATE TABLE IF NOT EXISTS agent_prompts (
+  workspace_id  INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  agent         TEXT NOT NULL,
+  body          TEXT NOT NULL,
+  updated_at    TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (workspace_id, agent)
+);`);
 // the full TikTok Studio analytics screen of a video (as in the local studio), not only the basics
 ensureColumns('stats', [
   ['total_watch_time', 'REAL DEFAULT 0'], ['reached', 'INTEGER DEFAULT 0'], ['profile_views', 'INTEGER DEFAULT 0'],
@@ -246,3 +268,19 @@ export function listVideos(wsId, channelId) {
 }
 
 export default db;
+
+// every TikTok post from a TikTok Studio export, matched to a film or not; stats keeps the film's best post
+db.exec(`CREATE TABLE IF NOT EXISTS tiktok_posts (
+  workspace_id  INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  tiktok_id     TEXT NOT NULL,
+  video_id      INTEGER REFERENCES videos(id) ON DELETE SET NULL,
+  match_how     TEXT DEFAULT '',
+  url           TEXT DEFAULT '',
+  caption       TEXT DEFAULT '',
+  posted_at     TEXT DEFAULT '',
+  duration      REAL DEFAULT 0,
+  views         INTEGER DEFAULT 0,
+  data          TEXT DEFAULT '{}',
+  imported_at   TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (workspace_id, tiktok_id)
+);`);

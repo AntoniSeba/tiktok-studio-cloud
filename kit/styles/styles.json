@@ -2,12 +2,30 @@
   "_info": "Style wizualne generatora. Każdy styl to skill HyperFrames pobrany od autora (folder skill/). Podglądy: public/styles/<id>/. Styl csk-* to jeden z 18 stylów pakietu studio-18 (spolszczony).",
   "styles": [
     {
+      "id": "kompozycja-silnikow",
+      "group": "Gatunki",
+      "name": "Kompozycja kanału o silnikach",
+      "tagline": "Układ, rytm i plansze z kanału o silnikach (5,4 mln wyświetleń) na dowolny temat: kicker, nagłówek ze słów lektora, bęben obietnicy, powody, karty.",
+      "best_for": "długie shorty 2-3 min, tezy kontrowersyjne, rankingi powodów, technika i mechanizmy",
+      "read": [
+        "wzor.jpg",
+        "KOMPOZYCJA.md"
+      ],
+      "engine": "Three.js lub SVG w HyperFrames",
+      "credit": {
+        "author": "Antoni Seba (kanał o silnikach)",
+        "repo": "",
+        "license": "własny"
+      }
+    },
+    {
       "id": "zabawki-3d",
       "group": "Gatunki",
       "name": "Postacie 3D jak zabawki",
       "tagline": "Okrągła postać 3D z winylu odgrywa temat: miękkie światło, cień, squash and stretch.",
       "best_for": "historyjki, \"co by było gdyby\", maskotka marki, tematy dla młodszych",
       "read": [
+        "wzor.jpg",
         "skill/SKILL.md"
       ],
       "engine": "Three.js w HyperFrames",
@@ -24,6 +42,7 @@
       "tagline": "Drżące tuszowe kontury, faktura papieru i kredki, proste postacie z dużą mimiką.",
       "best_for": "opowieści, lekcje życiowe, historia, ciepłe tematy",
       "read": [
+        "wzor.jpg",
         "skill/SKILL.md"
       ],
       "engine": "SVG + GSAP",
@@ -40,6 +59,7 @@
       "tagline": "Wielkie słowa są obrazem: uderzają, rozciągają się i podmieniają w rytm lektora.",
       "best_for": "hooki, mocne tezy, listy, motywacja, krótkie TikToki bez grafik",
       "read": [
+        "wzor.jpg",
         "skill/SKILL.md"
       ],
       "engine": "GSAP",
@@ -56,6 +76,7 @@
       "tagline": "Wykres niesie argument: linie rysują się w czasie, słupki rosną, licznik tyka, osie się przeskalowują.",
       "best_for": "dane, ceny, statystyki, \"jak to się zmieniło\"",
       "read": [
+        "wzor.jpg",
         "skill/SKILL.md"
       ],
       "engine": "SVG + GSAP",
@@ -72,6 +93,7 @@
       "tagline": "Schemat buduje się element po elemencie, strzałki się rysują, po krawędziach płyną paczki danych.",
       "best_for": "procesy, mechanizmy, \"co się dzieje, gdy...\", technologia",
       "read": [
+        "wzor.jpg",
         "skill/SKILL.md"
       ],
       "engine": "SVG + GSAP",
@@ -88,6 +110,7 @@
       "tagline": "Wycinanki, raster, podarty papier, zdjęcia archiwalne i mocna typografia jak w dokumentach Vox.",
       "best_for": "historia rzeczy, \"dlaczego X jest wszędzie\", reportaż, ciekawostki",
       "read": [
+        "wzor.jpg",
         "skill/SKILL.md",
         "collage-info/SKILL.md"
       ],
@@ -105,6 +128,7 @@
       "tagline": "Model 3D budowany przez agenta w Three.js: rozstrzelenia, przekroje, praca części krok po kroku.",
       "best_for": "silniki, maszyny, urządzenia, \"jak to jest zbudowane\"",
       "read": [
+        "wzor.jpg",
         "skill/SKILL.md",
         "skill/reference/03-komponenty-wizualne.md",
         "skill/reference/05-modele-3d.md"
@@ -123,6 +147,7 @@
       "tagline": "Dwa sprawdzone style w rytm muzyki: komiks w duchu Spider-Verse albo szklane karty jak na premierze.",
       "best_for": "premiery, nowości, energiczne explainery",
       "read": [
+        "wzor.jpg",
         "skill/SKILL.md"
       ],
       "engine": "GSAP",
@@ -139,6 +164,7 @@
       "tagline": "Reżyseria jak u seniora motion designu: jeden pomysł wizualny z marki, ruch w rytmie mowy, bez \"AI slopu\".",
       "best_for": "reklamy, produkty, marki, launch",
       "read": [
+        "wzor.jpg",
         "skill/SKILL.md",
         "skill/references/judgment.md"
       ],

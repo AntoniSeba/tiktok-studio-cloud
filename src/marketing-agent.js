@@ -10,7 +10,7 @@ import { BIBLIA_IDS } from './biblia.js';
 import { localParts } from './scheduler.js';
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-export const AGENT_MODEL = process.env.AGENT_MODEL || 'deepseek/deepseek-v4-flash';
+export const AGENT_MODEL = process.env.AGENT_MODEL || 'deepseek/deepseek-v4.1-flash';
 const MAX_STEPS = 10;
 
 db.exec(`

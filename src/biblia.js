@@ -28,7 +28,7 @@ export const BIBLIA = [
     rule: 'Martwe strefy: treść tylko w y 250-1430, poniżej y 1000 tylko do x 850 (prawa szyna z sercem i komentarzami), 40 px od lewej i prawej krawędzi.' },
   { id: 'tts', name: 'Cięcie ciszy i tempo 1,12x', short: 'Każda cisza i oddech wycięte, lektor przyspieszony raz.', step: true },
   { id: 'glosnosc', name: 'Głośność -14 LUFS', short: 'Normalizacja dźwięku gotowego filmu.', step: true },
-  { id: 'audyt', name: 'Audyt Biblii przed oddaniem', short: 'audyt.py musi dać PASS, inaczej poprawki i ponowny render.', step: true },
+  { id: 'audyt', name: 'Audyt Biblii przed renderem', short: 'audyt.py na snapshotach projektu (bez MP4) musi dać PASS, poprawki przed jedynym renderem.', step: true },
 ];
 export const BIBLIA_IDS = BIBLIA.map(b => b.id);
 export const bibliaList = () => BIBLIA.map(({ id, name, short }) => ({ id, name, short }));
@@ -67,7 +67,8 @@ export function bibliaFill(on, { cta }) {
     LOOP_FRAME: on.has('petla') ? ' Ostatnia klatka ma wyglądać jak pierwsza.' : '',
     LOUDNORM: on.has('glosnosc') ? ' Głośność: ffmpeg -y -i renders/film.mp4 -c:v copy -af loudnorm=I=-14:TP=-1.5:LRA=11 -c:a aac -b:a 192k renders/film-n.mp4 && mv renders/film-n.mp4 renders/film.mp4' : '',
     AUDIT_STEP: on.has('audyt')
-      ? '6a. AUDYT BIBLII (bramka): python3 $KIT/tools/biblia/audyt.py renders/film.mp4 --lektor assets/vo.mp3 . Każdy FAIL dotyczący włączonych zasad poprawiasz w projekcie, renderujesz i audytujesz ponownie (najwyżej 2 poprawki); FAIL z wyłączonych zasad pomijasz. WARN to wskazówka. Odpowiedz na punkty ręczne z raportu w DECYZJE.md. Skopiuj raport: cp renders/audyt-film.mp4.md ../audyt.md'
+      // runs on snapshots before the one and only render: a 10-minute render per fix round wasted the whole job
+      ? '5a. AUDYT BIBLII (bramka, PRZED renderem, bez MP4): cd "$JOB/project" && python3 $KIT/tools/biblia/audyt.py --hf . --lektor assets/vo.mp3 --out "$JOB/work" (dodaj --czasy "$JOB/plan.json", jeśli plan.json istnieje). Każdy FAIL dotyczący włączonych zasad poprawiasz w projekcie i audytujesz ponownie na snapshotach (najwyżej 2 poprawki); FAIL z wyłączonych zasad pomijasz. WARN to wskazówka. Odpowiedz na punkty ręczne z raportu w DECYZJE.md i skopiuj raport: cp "$JOB"/work/audyt-*.md "$JOB/audyt.md". Po renderze NIE audytujesz, NIE poprawiasz i NIE renderujesz ponownie: od razu oddajesz.'
       : '',
     STREFY_TOOL: on.has('strefy') ? 'python3 $KIT/tools/biblia/strefy.py project/snapshots (martwe strefy na zrzutach), ' : '',
   };

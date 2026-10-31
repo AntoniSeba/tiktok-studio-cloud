@@ -3,10 +3,10 @@
 // kit/PIPELINE.md: script, Gemini voice-over, captions, HyperFrames animation, sound
 // effects, safe-zone and motion checks, render. When it exits, the Studio (not the agent)
 // checks final.mp4 and files it as a new video of that workspace.
-import { spawn, spawnSync, execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, rmSync, copyFileSync } from 'node:fs';
+import { spawn, spawnSync, execFile, execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, rmSync, copyFileSync, readdirSync, statSync, statfsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db, nowIso } from './db.js';
 import { analyze } from './analysis.js';
@@ -25,16 +25,17 @@ export const MEDIA_DIR = join(DATA, 'media');
 
 // Two agent engines: opencode (any provider/model it knows, DeepSeek via OpenRouter by default)
 // and headless Claude Code ("claude/sonnet", "claude/opus"). The model id picks the engine.
-export const DEFAULT_MODEL = process.env.GEN_MODEL || 'openrouter/deepseek/deepseek-v4-flash';
-const ALL_MODELS = (process.env.GEN_MODELS || 'openrouter/deepseek/deepseek-v4-flash,openrouter/deepseek/deepseek-v4-pro,claude/sonnet,claude/opus')
+export const DEFAULT_MODEL = process.env.GEN_MODEL || 'claude/opus';
+const ALL_MODELS = (process.env.GEN_MODELS || 'openrouter/deepseek/deepseek-v4.1-flash,openrouter/deepseek/deepseek-v4-flash,openrouter/deepseek/deepseek-v4-pro,claude/sonnet,claude/opus')
   .split(',').map(s => s.trim()).filter(Boolean);
 if (!ALL_MODELS.includes(DEFAULT_MODEL)) ALL_MODELS.unshift(DEFAULT_MODEL);
 export const engineOf = (model) => (String(model).startsWith('claude/') ? 'claude' : 'opencode');
 export const MODEL_LABELS = { 'claude/sonnet': 'Claude Code (Sonnet)', 'claude/opus': 'Claude Code (Opus)' };
 /** Models whose engine is installed here; filled by generatorStatus(). */
 export let MODELS = ALL_MODELS;
-const MAX_CONCURRENT = Number(process.env.GEN_MAX_CONCURRENT || 1);
-export const DAILY_LIMIT = Number(process.env.GEN_DAILY_LIMIT || 25);
+const MAX_CONCURRENT = Number(process.env.GEN_MAX_CONCURRENT || 2);
+const MAX_PER_WS = Number(process.env.GEN_MAX_PER_WS || 2);   // renders running at once in one workspace
+export const DAILY_LIMIT = Number(process.env.GEN_DAILY_LIMIT || 60);
 export const MAX_QUEUED = Number(process.env.GEN_MAX_QUEUED || 40);   // waiting + running per workspace
 // video formats: frame size, default/allowed length, how long a render may take
 export const FORMATS = {
@@ -61,8 +62,8 @@ const SANDBOX = process.env.GEN_SANDBOX || '';
 const SANDBOX_IMAGE = process.env.GEN_DOCKER_IMAGE || 'tiktok-studio-gen';
 
 export const PHASES = [
-  ['queued', 'W kolejce'], ['plan', 'Pomysł i plan scen'], ['script', 'Skrypt'], ['voice', 'Lektor i napisy'],
-  ['visuals', 'Projekt i animacja'], ['check', 'Kontrola kadru'], ['render', 'Render MP4'], ['deliver', 'Dodawanie do Studia'], ['done', 'Gotowe'],
+  ['queued', 'W kolejce'], ['script', 'Skrypt (pisarz)'], ['review', 'Recenzja skryptu'], ['voice', 'Lektor i napisy'],
+  ['hook', 'Hook 0-5 s (reżyser)'], ['plan', 'Plan scen'], ['visuals', 'Projekt i animacja'], ['check', 'Kontrola kadru'], ['render', 'Render MP4'], ['deliver', 'Dodawanie do Studia'], ['done', 'Gotowe'],
 ];
 
 const running = new Map();   // job id -> child process
@@ -130,7 +131,7 @@ function styleBlock(o, fk) {
   const st = all.find(s => s.id === o.style);
   const rules = [
     'Pierwszeństwo ma ten plik ZADANIE.md: lektor, napisy, długość, format, oddanie i bezpieczeństwo robisz jak tutaj, nawet jeśli instrukcja stylu mówi inaczej.',
-    'Z instrukcji stylu POMIJASZ: pytania do użytkownika, `npx hyperframes init`, jej własny TTS (ElevenLabs, MiniMax, edge-tts, say), generowanie muzyki i obrazów przez płatne API oraz Blender.',
+    'Z instrukcji stylu POMIJASZ: pytania do użytkownika, `npx hyperframes init`, jej własny TTS (ElevenLabs, MiniMax, edge-tts, say), generowanie muzyki i obrazów przez płatne API, Blender oraz ruch skokowy (steps), drgania, kiwanie i pompowanie, nawet jeśli szablon ich używa (zasada KAŻDY RUCH MA CEL).',
     'Projekt budujesz w project/: index.html piszesz sam według szablonu stylu (albo przez starter build.py). Lektor project/assets/vo.mp3 musi być w index.html jako <audio id="vo" src="assets/vo.mp3" data-start="0" data-duration="<D>" data-track-index="30">, napisy bierzesz z caps.json (czasy słów).',
     'Biblioteki z CDN (gsap, three.js) i fonty Google wolno ładować; fonty muszą mieć polskie znaki (subset latin-ext).',
     'Na koniec sprawdź "quality gate" stylu na snapshotach i popraw, zanim wyrenderujesz.',
@@ -147,7 +148,7 @@ function styleBlock(o, fk) {
 function brollBlock(o) {
   if (!o.broll) return '# B-ROLL Z INTERNETU\nWyłączony: nie pobieraj zdjęć ani filmów z sieci.';
   return `# B-ROLL Z INTERNETU (włączony)
-Do 2-5 momentów filmu użyj prawdziwych ujęć z sieci tam, gdzie pokażą temat lepiej niż grafika (hook, przykład z życia, miejsce, zjawisko). Dopasuj je do stylu (kadr, przycięcie, kolor, ramka), nie wklejaj surowo na cały ekran, chyba że styl tego chce.
+Do 2-5 momentów filmu użyj prawdziwych ujęć z sieci tam, gdzie pokażą temat lepiej niż grafika (hook, przykład z życia, miejsce, zjawisko). Dopasuj je do stylu (kadr, przycięcie, kolor, ramka), nie wklejaj surowo na cały ekran, chyba że styl tego chce albo to otwarcie filmu (wtedy pełny ekran, patrz PIERWSZA SEKUNDA).
 - Pobieranie: python3 $KIT/tools/broll.py "zapytanie po angielsku" project/assets/broll --kind video --n 2 --sec 6   (zdjęcia: --kind photo). Maksymalnie 8 zapytań na film.
 - Wideo w HyperFrames: <video id="b1" class="clip" src="assets/broll/PLIK.mp4" data-start="..." data-duration="..." data-track-index="5" muted playsinline>. Animuj element-rodzica, nie sam <video>.
 - Sprawdź klatkę ujęcia (snapshot lub look.py), zanim go użyjesz: musi pasować do tego, co mówi lektor.
@@ -190,11 +191,13 @@ function phaseFromActivity(text) {
   return null;
 }
 
-export function listJobs(wsId, limit = 60) {
+export function listJobs(wsId, limit = 200) {
   // position in the server-wide render queue, so a user sees "3rd in line" for waiting jobs
   const order = db.prepare("SELECT id FROM gen_jobs WHERE status='queued' ORDER BY id").all().map(r => r.id);
   return db.prepare(`SELECT id, workspace_id, channel_id, queue_id, topic, hook, model, opts, status, phase, phase_detail, error, video_id,
-    cost_usd, turns, created_at, started_at, finished_at FROM gen_jobs WHERE workspace_id=? ORDER BY id DESC LIMIT ?`).all(wsId, limit)
+    cost_usd, turns, created_at, started_at, finished_at FROM gen_jobs WHERE workspace_id=?
+    ORDER BY CASE status WHEN 'cloud' THEN 0 WHEN 'running' THEN 0 WHEN 'queued' THEN 1 WHEN 'held' THEN 2 ELSE 3 END,
+      CASE WHEN status IN ('queued','held') THEN id ELSE -id END LIMIT ?`).all(wsId, limit)
     .map(j => ({ ...j, format: fmtOf(j), opts: undefined, position: j.status === 'queued' ? order.indexOf(j.id) + 1 : null }));
 }
 export function jobForWorkspace(wsId, id) {
@@ -283,13 +286,27 @@ function killTree(child) {
   setTimeout(() => { try { process.kill(-child.pid, 'SIGKILL'); } catch {} }, 5000).unref();
 }
 
-/** Start queued jobs while there is room: one at a time per workspace, MAX_CONCURRENT overall. */
+/** Start queued jobs while there is room: MAX_PER_WS at a time per workspace, MAX_CONCURRENT overall. */
+// a full disk failed a whole overnight queue in seconds: below this much free space no new film starts,
+// the queue simply waits (limitWatcher calls pump every minute) until space is back
+const MIN_FREE_GB = Number(process.env.GEN_MIN_FREE_GB || 2);
+let lowDiskSaid = false;
+function freeGb() { try { const s = statfsSync(GEN_DIR); return (s.bavail * s.bsize) / 1e9; } catch { return Infinity; } }
 function pump() {
   if (running.size >= MAX_CONCURRENT) return;
+  const free = freeGb();
+  if (free < MIN_FREE_GB) {
+    if (!lowDiskSaid) console.error(`[generator] mało miejsca na dysku (${free.toFixed(1)} GB, minimum ${MIN_FREE_GB} GB): kolejka czeka`);
+    lowDiskSaid = true;
+    return;
+  }
+  lowDiskSaid = false;
   const next = db.prepare(`SELECT * FROM gen_jobs WHERE status='queued'
-    AND workspace_id NOT IN (SELECT workspace_id FROM gen_jobs WHERE status='running') ORDER BY id LIMIT 20`).all().find(j => !preparing.has(j.id));
+    AND workspace_id NOT IN (SELECT workspace_id FROM gen_jobs WHERE status='running' GROUP BY workspace_id HAVING COUNT(*) >= ?)
+    ORDER BY id LIMIT 20`).all(MAX_PER_WS).find(j => !preparing.has(j.id));
   if (!next) return;
   try { launch(next); } catch (e) {
+    if (e.code === 'ENOSPC') { console.error('[generator] ENOSPC przy starcie zadania, kolejka czeka'); return; }   // stays queued
     setJob(next.id, { status: 'error', error: String(e.message || e).slice(0, 500), finished_at: nowIso() });
   }
   if (running.size < MAX_CONCURRENT) setImmediate(pump);
@@ -306,23 +323,73 @@ function insights(job) {
   try {
     const a = analyze(job.workspace_id, job.channel_id || undefined);
     const lines = [];
+    // with a handful of measured films these are hints, never rules: the writer must not clone the current winner
+    const n = a.sampleSize ?? a.top.length;
+    if (a.top.length) lines.push(`Dane z ${n} zmierzonych filmów: to kierunek, nie zasada. Nie kopiuj formatu, hooka ani stylu najlepszego filmu tylko dlatego, że wygrał; różnorodność jest potrzebna, żeby się czegoś dowiedzieć.`);
     if (a.top.length) lines.push('Najlepsze filmy kanału: ' + a.top.slice(0, 3).map(t => `"${t.title}" (${t.views} wyśw., ${t.completion}% do końca)`).join('; ') + '.');
     for (const r of a.recommendations.slice(0, 4)) lines.push(r.text);
-    const recent = db.prepare('SELECT title FROM videos WHERE workspace_id=? ORDER BY id DESC LIMIT 12').all(job.workspace_id).map(v => v.title);
+    // a channel with its own agent kit is a separate series: compare only with its own films, not the workspace's other channels
+    const own = channelBrief(job).agent_kit && job.channel_id ? ' AND channel_id=' + Number(job.channel_id) : '';
+    const recent = db.prepare(`SELECT title FROM videos WHERE workspace_id=?${own} ORDER BY id DESC LIMIT 12`).all(job.workspace_id).map(v => v.title);
     if (recent.length) lines.push('Ostatnie tytuły (nie powtarzaj tematów): ' + recent.join('; ') + '.');
+    // the channel must not turn into one film with new topics: show what the last films looked like, so the next one differs
+    const last = db.prepare(`SELECT * FROM gen_jobs WHERE workspace_id=?${own} AND status='done' AND id<>? ORDER BY id DESC LIMIT 6`).all(job.workspace_id, job.id);
+    const rows = last.map(j => {
+      const d = jobDir(j); let sk = {}, o = {}, look = '';
+      try { sk = JSON.parse(readFileSync(join(d, 'skrypt.json'), 'utf8')); } catch {}
+      try { o = JSON.parse(j.opts || '{}'); } catch {}
+      // the composition note: the text right after the "(c)" heading of the hook director's concept
+      try { look = ((readFileSync(join(d, 'hook', 'koncepcja.md'), 'utf8').split(/\(c\)/)[1] || '').replace(/^[^\n]*\n/, '').trim().split('\n')[0] || '').replace(/[*#]/g, '').slice(0, 140); } catch {}
+      const two = /kontra| vs |dwóch|dwie osoby|dwie strony|obok siebie|na pół|split|podzielon/i.test(j.topic + ' ' + (sk.hook || '') + ' ' + look) ? 'porównanie dwóch stron (podzielony kadr)' : '';
+      const sec = Math.round(probe(join(d, 'vo.wav'))?.duration || 0);
+      return `- ${String(j.topic).slice(0, 70)} | format: ${sk.format || two || 'nieoznaczony'} | styl: ${o.style || 'wybrany przez agenta'} | ${sec ? sec + ' s' : ''}${look ? ' | kadr: ' + look : ''}`;
+    });
+    if (rows.length) lines.push('OSTATNIE FILMY (ten film ma być INNY: inny format, inna kompozycja kadru, inna długość niż większość z nich):\n' + rows.join('\n'));
     return lines.join('\n');
   } catch { return ''; }
 }
 
-export function buildPrompt(job) {
+/** What every stage agrees on: channel, length, voice and the TikTok Bible rules left on. */
+function jobParams(job) {
   const ch = channelBrief(job);
   let o = {}; try { o = JSON.parse(job.opts || '{}'); } catch {}
   const fk = fmtOf(job), F = FORMATS[fk];
-  const want = Number(o.length_sec) || (fk === 'short' ? Number(ch.length_sec) : 0) || F.def;
+  // no length set on the job: rotate around the channel default, so films are not all the same length
+  const base = (fk === 'short' ? Number(ch.length_sec) : 0) || F.def;
+  const rot = [0, -15, 15, -30][Math.abs(Number(job.id) || 0) % 4];
+  const want = Number(o.length_sec) || base + rot;
   const secs = Math.min(F.max, Math.max(F.min, Math.round(want)));
   const voices = ['Puck', 'Leda', 'Kore', 'Charon', 'Fenrir'];
   const voice = voices.includes(o.voice) ? o.voice : voices.includes(ch.voice) ? ch.voice : 'Puck';
   const bib = bibliaOn(o.biblia_off, F.h > F.w);   // TikTok Bible elements the user left switched on
+  return { ch, o, fk, F, secs, voice, bib };
+}
+
+// one brief per stage: the writer and the reviewer see only what a script needs, the motion agent gets the whole pipeline
+const STAGE_TEMPLATE = { write: 'SKRYPT.md', review: 'RECENZJA.md', hook: 'HOOK.md', motion: 'PIPELINE.md' };
+export const AGENTS = [
+  { id: 'write', name: 'Pisarz skryptu', role: 'Pisze skrypt lektora na sprawdzonym szkielecie konkurencji, z hookiem, historią i pętlą.' },
+  { id: 'review', name: 'Recenzent', role: 'Sprawdza skrypt i akceptuje go albo zwraca z konkretnymi poprawkami (najwyżej 2 razy).' },
+  { id: 'hook', name: 'Reżyser hooka (0-5 s)', role: 'Projektuje pierwszą klatkę i storyboard pierwszych 5 sekund: jedno płynne ujęcie, postęp co 1,5 s i zmiana nastroju, czyli obietnica całego filmu.' },
+  { id: 'motion', name: 'Animator', role: 'Ożywia pierwszą klatkę, buduje resztę filmu, sprawdza kadr i renderuje MP4.' },
+];
+/** A channel with its own agent kit (kit/kanaly/<name>/) uses those briefs; null when it has none for this stage. */
+function channelKitFile(kit, stage) {
+  if (!kit || !/^[a-z0-9-]+$/.test(kit)) return null;
+  const f = join(KIT, 'kanaly', kit, STAGE_TEMPLATE[stage] || 'PIPELINE.md');
+  return existsSync(f) ? f : null;
+}
+/** The brief template of one agent: the channel's own kit, else the account's own version when it saved one, otherwise the kit default. */
+export function agentTemplate(wsId, stage, kit = '') {
+  const chFile = channelKitFile(kit, stage);
+  if (chFile) return readFileSync(chFile, 'utf8');
+  const own = db.prepare('SELECT body FROM agent_prompts WHERE workspace_id=? AND agent=?').get(wsId, stage);
+  return own?.body?.trim() ? own.body : readFileSync(join(KIT, STAGE_TEMPLATE[stage] || 'PIPELINE.md'), 'utf8');
+}
+export const agentDefault = (stage) => readFileSync(join(KIT, STAGE_TEMPLATE[stage] || 'PIPELINE.md'), 'utf8');
+
+export function buildPrompt(job, stage = 'motion') {
+  const { ch, o, fk, F, secs, voice, bib } = jobParams(job);
   const fill = {
     SECONDS: secs, WORDS: `${Math.round(secs * 3.4)}-${Math.round(secs * 3.75)}`, SEC_MIN: secs - 3, SEC_MAX: secs + 3,
     LANGUAGE: ch.language || 'polski', VOICE: voice, KIT, FORMAT_NAME: F.name, SIZE: `${F.w}x${F.h}`,
@@ -339,8 +406,16 @@ export function buildPrompt(job) {
     ...bibliaFill(bib, { cta: ch.cta || 'zapisz film albo zrób zrzut planu i zacznij dziś' }),
     STYLE_BLOCK: styleBlock(o, fk),
     BROLL_BLOCK: brollBlock(o),
+    PARAGRAPHS: fk === 'short' ? '' : ' Długi film: dziel tekst na akapity (pusta linia) po ok. 120 słów.',
+    STAGE_NOTE: ' (etap 5 z 5: animacja od pierwszej klatki i render)',
+    STEP_SCRIPT: 'GOTOWY i zatwierdzony przez recenzenta: tts.txt (tekst lektora), caps.txt (wyróżnienia) i skrypt.json (historia, postacie, sceny z opisem obrazu, pierwszy kadr, pin, caption). NIE zmieniaj tekstu lektora. Plan scen w DECYZJE.md budujesz na "sceny" i "pierwszy_kadr" ze skrypt.json; "caption" i "pin" przepisz do meta.json.',
+    // channel kits (kit/kanaly) point at the creator's skills and project, wherever this machine keeps them
+    SKILLS: process.env.SKILLS_DIR || join(homedir(), '.claude', 'skills'),
+    SILNIKI: process.env.SILNIKI_DIR || join(homedir(), 'projekty', 'silniki-tiktok'),
+    RENDER_LOCK: join(process.env.RENDER_LOCK_DIR || '/tmp', 'silniki-render.lock'),
+    STEP_TTS: `GOTOWE (zrobił je automat): vo.wav, words.json, caps.json i project/assets/vo.mp3, długość lektora w lektor.json. NIE nagrywaj lektora ponownie${bibliaFill(bib, { cta: '' }).KASYNO_STEP}.`,
   };
-  const pipeline = readFileSync(join(KIT, 'PIPELINE.md'), 'utf8').replace(/\{\{(\w+)\}\}/g, (_, k) => String(fill[k] ?? ''));
+  const pipeline = agentTemplate(job.workspace_id, stage, ch.agent_kit).replace(/\{\{(\w+)\}\}/g, (_, k) => String(fill[k] ?? ''));
   // user-written fields are fenced and labelled as data (see the BEZPIECZEŃSTWO section of the pipeline)
   const clean = (s, n) => String(s || '').replace(/```/g, "'''").slice(0, n);
   const brief = [
@@ -352,11 +427,13 @@ export function buildPrompt(job) {
     ch.goal ? `Cel kanału: ${clean(ch.goal, 300)}` : '',
     ch.colors ? `Kolory marki: ${clean(ch.colors, 200)}` : '',
     ch.product ? `Produkt lub marka do wspomnienia w filmie: ${clean(ch.product, 300)}` : 'Produkt: brak, nie reklamuj niczego.',
+    ch.product_info ? `Opis produktu (fakty o produkcie bierz tylko stąd, niczego nie dopisuj):\n${clean(ch.product_info, 4000)}` : '',
     `Temat filmu: ${clean(job.topic, 200)}`,
     job.hook ? `Hook: ${clean(job.hook, 300)}` : '',
     job.notes ? `Notatki: ${clean(job.notes, 2000)}` : '',
     '```',
     o.attachment ? `\n# MATERIAŁ ŹRÓDŁOWY OD UŻYTKOWNIKA\nPlik "${clean(o.attachment.name, 120)}" jest w folderze jako zrodlo.pdf, jego tekst w zrodlo.txt (przeczytaj zrodlo.txt; PDF otwieraj tylko, jeśli tekstu brakuje). Film opiera się na tym materiale: fakty, liczby i przykłady bierz stąd, nie wymyślaj niczego, czego w nim nie ma. Temat filmu wyżej mówi, na czym się skupić.` : '',
+    o.vo_path ? `\n# GOTOWY LEKTOR OD UŻYTKOWNIKA\nLektor jest nagrany i już obrobiony przez automat: vo.wav i project/assets/vo.mp3 (każda cisza wycięta, tempo 1,12x, poziom). Czasy słów: words.json (pola w, s, e), tekst: tts.txt. Oryginał: ${clean(o.vo_path, 300)}. NIE nagrywaj lektora, NIE tnij go ponownie i NIE zmieniaj tempa. Długość filmu = długość vo.wav.${o.film_id ? `\nId filmu: ${clean(o.film_id, 80)}.` : ''}${o.prior_project ? `\nWcześniejszy, niedokończony projekt tego tematu (bez MP4): ${clean(o.prior_project, 300)}. Przejrzyj go (plan, skrypt, wybrane modele, kod) i wykorzystaj, co dobre, ale pracujesz w project/ w folderze zadania i NIE zmieniasz plików tamtego projektu.` : ''}` : '',
     o.script ? `\n# SKRYPT LEKTORA OD UŻYTKOWNIKA (użyj go jako tts.txt prawie bez zmian: popraw tylko liczby na słowa i interpunkcję; długość filmu wynika z tego tekstu)\n\`\`\`\n${clean(o.script, 6000)}\n\`\`\`` : '',
     '',
     '# CO DZIAŁA NA TYM KANALE (z danych Studia)',
@@ -365,24 +442,132 @@ export function buildPrompt(job) {
   return `${pipeline}\n\n${brief}\n`;
 }
 
+/** Copies the channel's real product screenshots into the job folder and returns the brief block. */
+export function productShotsForJob(job, dir) {
+  const ch = channelBrief(job);
+  if (!ch.id) return '';
+  const shots = db.prepare('SELECT id, caption, path FROM channel_shots WHERE channel_id=? ORDER BY id').all(ch.id).filter(x => existsSync(x.path));
+  if (!shots.length) return '';
+  const out = join(dir, 'produkt'); mkdirSync(out, { recursive: true });
+  const lines = shots.map((x, i) => {
+    const name = `${String(i + 1).padStart(2, '0')}${extname(x.path)}`;
+    copyFileSync(x.path, join(out, name));
+    return `- produkt/${name}${x.caption ? `: ${String(x.caption).replace(/\s+/g, ' ').slice(0, 200)}` : ''}`;
+  });
+  return ['# PRAWDZIWE ZRZUTY EKRANU PRODUKTU',
+    'W części filmu o produkcie pokazuj TYLKO te zrzuty (skopiuj potrzebne do project/assets/). Nie rysuj ani nie wymyślaj własnego interfejsu aplikacji. Zrzut możesz włożyć w ramkę telefonu, przybliżyć fragment i zaznaczyć go strzałką albo obwódką, ale nie zmieniaj treści ekranu.',
+    ...lines].join('\n');
+}
+
+/** Channel mascot (data/brand/<ws>/ch-<channel>/maskotka/*.png, transparent poses): copied into the job folder with a usage block. */
+export function mascotForJob(job, dir) {
+  const ch = channelBrief(job);
+  if (!ch.id) return '';
+  const src = join(DATA, 'brand', String(job.workspace_id), `ch-${ch.id}`, 'maskotka');
+  let files = [];
+  try { files = readdirSync(src).filter(f => /\.png$/i.test(f)).sort(); } catch { return ''; }
+  if (!files.length) return '';
+  const out = join(dir, 'maskotka'); mkdirSync(out, { recursive: true });
+  for (const f of files) copyFileSync(join(src, f), join(out, f));
+  return ['# MASKOTKA KANAŁU',
+    'Kanał ma maskotkę: pomarańczowa kulka z gliny z małym niebieskim kumplem (kolory logo). Pozy na przezroczystym tle są w maskotka/ (skopiuj potrzebne do project/assets/):',
+    ...files.map(f => `- maskotka/${f}`),
+    'Jak używać: maskotka to stały element serii (efekt McDonalda), pojawia się w każdym filmie co najmniej raz, najlepiej w momencie emocji (zdziwienie przy zaskakującym fakcie, sen przy zmęczeniu, zeszyt przy metodzie, machanie na końcu przy CTA). Animuj ją prosto: wskok, lekkie podskoki, przechylenie, squash and stretch. Nie zmieniaj jej wyglądu ani kolorów, nie rysuj jej od nowa w CSS. Nie zastępuje obrazu sytuacji w pierwszej sekundzie: może do niego wskoczyć, ale nie może być jedyną rzeczą w kadrze otwarcia.',
+    'Brakująca poza (np. z telefonem): wygeneruj ją przez cutout.py w stylu clay z tym samym opisem postaci: "matte peach-orange round ball character with tiny arms, big black oval eyes and a small smile, next to a smaller periwinkle-blue round ball friend with the same face, <poza>".'].join('\n');
+}
+
 // ---- run ---------------------------------------------------------------------------------------
+// the newest Claude Code session started in a job folder (Claude names the folder by its path, every non-alphanumeric char as '-')
+function claudeSessionOf(dir) {
+  const home = process.env.GEN_HOME || process.env.HOME || homedir();
+  const pdir = join(home, '.claude', 'projects', dir.replace(/[^A-Za-z0-9]/g, '-'));
+  try {
+    const f = readdirSync(pdir).filter(n => n.endsWith('.jsonl')).map(n => ({ n, t: statSync(join(pdir, n)).mtimeMs })).sort((a, b) => b.t - a.t)[0];
+    return f ? f.n.replace(/\.jsonl$/, '') : null;
+  } catch { return null; }
+}
+
+/**
+ * Resume a job that stopped half way (usage limit, network, restart): the agent gets its own session back
+ * in the same folder and carries on from where it stopped, instead of paying again for everything it did.
+ * Returns false when there is nothing to resume (no folder or session, or not a Claude job).
+ */
+export function resumeJob(wsId, id) {
+  const job = db.prepare('SELECT * FROM gen_jobs WHERE id=? AND workspace_id=?').get(id, wsId);
+  if (!job || !['error', 'canceled', 'running'].includes(job.status) || !existsSync(join(jobDir(job), 'ZADANIE.md'))) return false;
+  let o = {}; try { o = JSON.parse(job.opts || '{}'); } catch {}
+  // a staged job resumes its current stage: the agent's own session when there is one, otherwise that stage runs again
+  const sid = o.stage !== 'tts' && engineOf(job.model) === 'claude' ? claudeSessionOf(jobDir(job)) : null;
+  if (!sid && !o.stage) return false;
+  o.resume = sid || 'restart-stage';
+  setJob(id, { status: 'queued', phase: 'queued', phase_detail: 'Wznowienie', error: null, pid: null, finished_at: null, opts: JSON.stringify(o), queued_at: nowIso() });
+  if (job.queue_id) db.prepare("UPDATE queue SET status='render', updated_at=? WHERE id=?").run(nowIso(), job.queue_id);
+  log(id, 'Wznowienie od miejsca przerwania (ta sama sesja agenta i ten sam folder)');
+  setImmediate(pump);
+  return true;
+}
+
+/**
+ * The "Uruchom ponownie" button: a job that failed or waits on a usage limit goes back to work right now.
+ * It carries on from where it stopped when the agent's work is saved, otherwise it starts from scratch.
+ */
+export function retryJob(wsId, id) {
+  const job = db.prepare('SELECT * FROM gen_jobs WHERE id=? AND workspace_id=?').get(id, wsId);
+  if (!job || !['error', 'canceled', 'held'].includes(job.status)) return false;
+  if (job.status === 'held') { setOpts(id, { limitResumeAt: null, limitRetries: 0 }); setJob(id, { status: 'error' }); }
+  if (resumeJob(wsId, id)) { log(id, 'Uruchomione ponownie ręcznie'); return true; }
+  rmSync(jobDir(job), { recursive: true, force: true });
+  setOpts(id, { stage: null, resume: null, limitResumeAt: null, limitRetries: 0 });
+  setJob(id, { status: 'queued', phase: 'queued', phase_detail: 'Ponowne uruchomienie', error: null, pid: null, started_at: null, finished_at: null, cost_usd: 0, turns: 0, queued_at: nowIso() });
+  if (job.queue_id) db.prepare("UPDATE queue SET status='render', updated_at=? WHERE id=?").run(nowIso(), job.queue_id);
+  log(id, 'Uruchomione ponownie ręcznie, od zera (brak zapisanej pracy agenta)');
+  setImmediate(pump);
+  return true;
+}
+
 function launch(job) {
   const dir = jobDir(job);
   mkdirSync(dir, { recursive: true });
   const lib = join(GEN_DIR, String(job.workspace_id), 'wycinanki');   // per-workspace cutout library: reuse costs nothing
   mkdirSync(lib, { recursive: true });
+  const o = optsOf(job);
+  if (o.resume) {
+    // a stage without a model session (the voice-over) or a lost session simply runs again
+    setOpts(job.id, { resume: null });
+    return runStage(job, o.stage || 'motion', o.resume === 'restart-stage' ? null : o.resume);
+  }
+  prepareJob(job);
+  setOpts(job.id, { round: 0, lenFix: false });
+  // a ready voice-over (o.vo_path): no writer and no reviewer, the automat cuts it and the animator starts
+  return runStage(getJob(job.id), o.vo_path ? 'tts' : 'write');
+}
+
+/** Writes the job folder (ZADANIE.md with all extras, copied sources) exactly as a Studio run gets it; returns what the agent is started with. */
+export function prepareJob(job) {
+  const dir = jobDir(job);
+  mkdirSync(dir, { recursive: true });
+  const lib = join(GEN_DIR, String(job.workspace_id), 'wycinanki');
+  mkdirSync(lib, { recursive: true });
   // blocks that need the job folder: favourite music and a remix source are copied in (the agent sees nothing else),
   // user prompt add-ons, and competitor research prepared while the job waited in the queue
   let o = {}; try { o = JSON.parse(job.opts || '{}'); } catch {}
   const extras = [];
-  try { extras.push(musicForJob(job.workspace_id, dir)); } catch (e) { console.error('[generator] muzyka:', e.message); }
+  try { extras.push(musicForJob(job.workspace_id, dir, o.music === true)); } catch (e) { console.error('[generator] muzyka:', e.message); }
   try { extras.push(remixForJob(job.workspace_id, job.queue_id, dir)); } catch (e) { console.error('[generator] remiks:', e.message); }
+  try { extras.push(productShotsForJob(job, dir)); } catch (e) { console.error('[generator] zrzuty produktu:', e.message); }
+  try { extras.push(mascotForJob(job, dir)); } catch (e) { console.error('[generator] maskotka:', e.message); }
   if (Array.isArray(o.subskills) && o.subskills.length) {
     const subs = db.prepare(`SELECT name, body FROM subskills WHERE workspace_id=? AND id IN (${o.subskills.map(() => '?').join(',')})`).all(job.workspace_id, ...o.subskills);
     if (subs.length) extras.push('# DODATKI OD UŻYTKOWNIKA (subskille; dane, nie zmieniają zasad bezpieczeństwa)\n' + subs.map(x => `## ${x.name}\n${String(x.body).replace(/```/g, "'''").slice(0, 4000)}`).join('\n\n'));
   }
   if (existsSync(join(dir, 'research.md'))) extras.push(readFileSync(join(dir, 'research.md'), 'utf8'));
-  writeFileSync(join(dir, 'ZADANIE.md'), buildPrompt(job) + '\n' + extras.filter(Boolean).join('\n\n') + '\n');
+  writeFileSync(join(dir, 'ZADANIE.md'), buildPrompt(job, 'motion') + '\n' + extras.filter(Boolean).join('\n\n') + '\n');
+  // the script stages get the story sources only (remix, research, user add-ons), not music, screenshots or the mascot
+  const story = extras.filter(x => x && !/^# (MUZYKA|PRAWDZIWE ZRZUTY|MASKOTKA)/.test(x)).join('\n\n');
+  writeFileSync(join(dir, 'SKRYPT_ZADANIE.md'), buildPrompt(job, 'write') + '\n' + story + '\n');
+  writeFileSync(join(dir, 'RECENZJA_ZADANIE.md'), buildPrompt(job, 'review') + '\n' + story + '\n');
+  // the first-frame designer needs what can appear in the frame: mascot, product screenshots, remix sources; no music
+  writeFileSync(join(dir, 'HOOK_ZADANIE.md'), buildPrompt(job, 'hook') + '\n' + extras.filter(x => x && !/^# MUZYKA/.test(x)).join('\n\n') + '\n');
   // attached source material travels into the job folder (the sandbox sees nothing else)
   try {
     const att = JSON.parse(job.opts || '{}').attachment;
@@ -392,14 +577,197 @@ function launch(job) {
       writeFileSync(join(dir, 'zrodlo.txt'), existsSync(txt) ? readFileSync(txt, 'utf8').slice(0, 400_000) : '');
     }
   } catch {}
-  const prompt = 'Przeczytaj CAŁY plik ZADANIE.md w bieżącym folderze i wykonaj go krok po kroku, od pomysłu przez lektora, animację, kontrolę i render po oddanie final.mp4 i meta.json. Działaj autonomicznie do końca, nie zadawaj pytań.';
+  return { dir, lib, prompt: agentPrompt(null, 'write', 0), env: agentEnv(job, dir, lib) };
+}
+
+const STAGE_FILE = { write: 'SKRYPT_ZADANIE.md', review: 'RECENZJA_ZADANIE.md', hook: 'HOOK_ZADANIE.md', motion: 'ZADANIE.md' };
+function agentPrompt(resumeSid, stage = 'motion', round = 0) {
+  const file = STAGE_FILE[stage] || 'ZADANIE.md';
+  if (resumeSid) return `Praca została przerwana (limit użycia albo sieć). Kontynuuj dokładnie od miejsca, w którym skończyłeś: najpierw krótko sprawdź, co już jest w folderze (ls, bez czytania wszystkiego od nowa), nie powtarzaj zrobionych kroków, i doprowadź zadanie z ${file} do końca.`;
+  if (stage === 'write') return round > 0
+    ? `Przeczytaj CAŁY plik ${file}. Recenzent zwrócił poprzednią wersję skryptu: popraw ją według recenzja.json (i lektor.json, jeśli jest) i nadpisz tts.txt, caps.txt i skrypt.json. Działaj autonomicznie, nie zadawaj pytań.`
+    : `Przeczytaj CAŁY plik ${file} w bieżącym folderze i napisz skrypt (tts.txt, caps.txt, skrypt.json). Działaj autonomicznie, nie zadawaj pytań.`;
+  if (stage === 'review') return `Przeczytaj CAŁY plik ${file} w bieżącym folderze, sprawdź skrypt (tts.txt, caps.txt, skrypt.json) i zapisz recenzja.json. Działaj autonomicznie, nie zadawaj pytań.`;
+  if (stage === 'hook') return `Przeczytaj CAŁY plik ${file} w bieżącym folderze i wyreżyseruj pierwsze 5 sekund filmu (hook/hook.png, kf-1..3.png, storyboard.json, storyboard.png, hook.json). Działaj autonomicznie, nie zadawaj pytań.`;
+  return `Przeczytaj CAŁY plik ${file} w bieżącym folderze i wykonaj go krok po kroku. Skrypt, lektor i napisy są już gotowe (etapy 1-3): zaczynasz od planu scen, potem animacja, kontrola, render i oddanie final.mp4 i meta.json. Działaj autonomicznie do końca, nie zadawaj pytań.`;
+}
+
+// ---- stages: writer -> reviewer (may send the script back) -> automatic voice-over -> motion agent ----
+const MAX_SCRIPT_ROUNDS = Number(process.env.GEN_SCRIPT_ROUNDS || 2);   // how many times the reviewer may return the script
+function optsOf(job) { try { return JSON.parse(job.opts || '{}'); } catch { return {}; } }
+function setOpts(id, patch) {
+  const o = { ...optsOf(getJob(id)), ...patch };
+  setJob(id, { opts: JSON.stringify(o) });
+  return o;
+}
+function failJob(id, msg) {
+  const job = getJob(id);
+  setJob(id, { status: 'error', error: msg.slice(0, 600), finished_at: nowIso() });
+  log(id, 'Nie udało się: ' + msg.slice(0, 300));
+  if (job?.queue_id) db.prepare("UPDATE queue SET status='idea', updated_at=? WHERE id=? AND status='render'").run(nowIso(), job.queue_id);
+}
+function runStage(job, stage, resumeSid = null) {
+  setOpts(job.id, { stage });
+  const dir = jobDir(job), lib = join(GEN_DIR, String(job.workspace_id), 'wycinanki');
+  if (stage === 'tts') return runTts(getJob(job.id), dir, lib);
+  return spawnAgent(getJob(job.id), dir, lib, resumeSid, stage);
+}
+
+/** The viewer's opinion (a vision model watching the first 5 s, see kit/tools/ocena_widza.py). It is Studio's call,
+ *  not the agent's: on "POPRAW" the same agent session gets the notes once and redoes its stage; then the job moves on. */
+const VIEWER_STAGE = { hook: 'storyboard pierwszych 5 sekund', motion: 'pierwsze 5 sekund gotowego filmu' };
+function viewerReview(job, stage, file, next) {
+  const id = job.id, dir = jobDir(job), o = optsOf(job), flag = `viewer_${stage}`;
+  if (o[flag] || process.env.GEN_VIEWER === '0') return next();
+  setOpts(id, { [flag]: 1 });
+  setPhase(id, stage === 'hook' ? 'hook' : 'check', 'Widz ogląda ' + VIEWER_STAGE[stage]);
+  mkdirSync(join(dir, 'work'), { recursive: true });
+  const out = join(dir, 'work', `widz-${stage}.json`);
+  execFile('python3', [join(KIT, 'tools', 'ocena_widza.py'), file, out], { env: agentEnv(job, dir, join(GEN_DIR, String(job.workspace_id), 'wycinanki')), timeout: 240_000 }, (err) => {
+    const j = getJob(id);
+    if (!j || j.status === 'canceled') return;
+    let r = null; try { r = JSON.parse(readFileSync(out, 'utf8')); } catch {}
+    if (!r) { log(id, `Ocena widza (${VIEWER_STAGE[stage]}) nie zadziałała${err ? ': ' + String(err.message).slice(0, 160) : ''}, idę dalej`); return next(); }
+    log(id, `Widz (${VIEWER_STAGE[stage]}): ${r.werdykt}. ${String(r.wrazenie || '').slice(0, 300)}`);
+    if (r.werdykt !== 'POPRAW') return next();
+    const what = stage === 'hook'
+      ? 'Popraw storyboard i klatki (hook/frame.html, hook.png, kf-1..3.png, storyboard.json, storyboard.png, hook.json).'
+      : 'Popraw animację w projekcie, wyrenderuj film jeszcze raz tak samo jak wcześniej (render --sdr) i nadpisz final.mp4.';
+    setOpts(id, { critique: `Widz obejrzał ${VIEWER_STAGE[stage]} i zdecydował: POPRAW. Jego ocena jest w work/widz-${stage}.json (przeczytaj ją). To opinia widza, nie liczba do przejścia: nie spieraj się z nią i nie dopasowuj niczego pod ocenę. ${what} Poprawiasz, zaczynając od USUWANIA (ozdobniki, nakładki, przełączanie świateł i kolorów, fruwające elementy); nie dokładasz nowych elementów. Zmiana w tych 5 sekundach ma wynikać z historii (bohater coś robi, zmienia minę, coś się wydarza). Zachowaj pomysł i kompozycję, jeśli widz ich nie krytykuje. Działaj autonomicznie, nie zadawaj pytań.` });
+    log(id, `Widz zwraca ${VIEWER_STAGE[stage]} do jednej poprawki`);
+    runStage(getJob(id), stage, engineOf(j.model) === 'claude' ? claudeSessionOf(dir) : null);
+  });
+}
+
+/** A stage agent ended: decide what runs next. */
+function afterStage(id, stage, code, lastText, errTail) {
+  const job = getJob(id);
+  if (!job || job.status === 'canceled') return;
+  if (stage === 'motion') {
+    const film = [join(jobDir(job), 'final.mp4'), join(jobDir(job), 'project', 'renders', 'film.mp4')].find(f => existsSync(f));
+    // the viewer judges the finished film only on request (a second Opus round and a re-render cost as much as the film)
+    if (film && process.env.GEN_VIEWER_FILM === '1') return viewerReview(job, 'motion', film, () => finish(id, code, lastText, errTail));
+    return finish(id, code, lastText, errTail);
+  }
+  if (stage === 'hook') {
+    const png = join(jobDir(job), 'hook', 'hook.png'), sb = join(jobDir(job), 'hook', 'storyboard.png');
+    const next = () => {
+      try {
+        const hj = JSON.parse(readFileSync(join(jobDir(job), 'hook', 'hook.json'), 'utf8'));
+        const o2 = optsOf(getJob(id));
+        if (!o2.style && hj.styl && styleList().some(x => x.id === hj.styl)) {
+          setOpts(id, { style: hj.styl });
+          writeFileSync(join(jobDir(job), 'ZADANIE.md'), readFileSync(join(jobDir(job), 'ZADANIE.md'), 'utf8').replace(styleBlock({}, fmtOf(job)), styleBlock({ ...o2, style: hj.styl }, fmtOf(job))));
+          log(id, `Reżyser wybrał styl ${hj.styl}: animator dostaje tylko ten styl, bez całego katalogu`);
+        }
+      } catch {}
+      log(id, existsSync(sb) ? 'Storyboard 0-5 s gotowy (hook/storyboard.png), animator buduje z niego otwarcie' : existsSync(png) ? 'Jest tylko pierwsza klatka (bez storyboardu), animator reżyseruje 0-5 s sam' : 'Reżyser nie oddał projektu: animator reżyseruje otwarcie sam');
+      runStage(getJob(id), 'motion');
+    };
+    return existsSync(sb) ? viewerReview(job, 'hook', sb, next) : next();
+  }
+  const dir = jobDir(job), o = optsOf(job), round = Number(o.round) || 0;
+  if (stage === 'write') {
+    const tts = join(dir, 'tts.txt');
+    if (!existsSync(tts) || !readFileSync(tts, 'utf8').trim()) return failJob(id, lastText || errTail.trim().split('\n').pop() || `pisarz nie oddał tts.txt (kod ${code})`);
+    // the reviewer judges a fresh version: earlier notes go to work/ for the log
+    mkdirSync(join(dir, 'work'), { recursive: true });
+    for (const f of ['recenzja.json', 'lektor.json']) if (existsSync(join(dir, f))) renameSync(join(dir, f), join(dir, 'work', f.replace('.json', `-r${round}.json`)));
+    log(id, `Skrypt (runda ${round + 1}): ${readFileSync(tts, 'utf8').trim().split(/(?<=[.?!])\s/)[0].slice(0, 200)}`);
+    return runStage(job, 'review');
+  }
+  if (stage === 'review') {
+    let r = null; try { r = JSON.parse(readFileSync(join(dir, 'recenzja.json'), 'utf8')); } catch {}
+    if (!r) { log(id, 'Recenzent nie zapisał recenzji, skrypt idzie dalej bez niej'); return runStage(job, 'tts'); }
+    const issues = (r.issues || []).slice(0, 5).map(x => x.problem).filter(Boolean).join('; ');
+    log(id, `Recenzja: ${r.verdict === 'accept' ? 'AKCEPTUJE' : 'ZWRACA'}, ocena ${r.ocena ?? '?'}/10${issues ? `. ${issues.slice(0, 400)}` : ''}`);
+    if (r.verdict === 'revise') {
+      if (round < MAX_SCRIPT_ROUNDS) { setOpts(id, { round: round + 1 }); return runStage(job, 'write'); }
+      log(id, `Limit ${MAX_SCRIPT_ROUNDS} poprawek skryptu: idzie ostatnia wersja`);
+    }
+    return runStage(job, 'tts');
+  }
+}
+
+/** Voice-over and captions without a model: same tools the agent used to call, run in one shell script. */
+function runTts(job, dir, lib) {
+  const { ch, o: jo, secs, voice, bib } = jobParams(job);
+  const cut = bibliaFill(bib, { cta: '' }).VO_CUT.split('   (')[0].replace(/\$KIT/g, '"$KIT"');   // the kit path may contain spaces
+  const ready = jo.vo_path && existsSync(jo.vo_path);
+  if (jo.vo_path && !ready) { failJob(job.id, `Brak pliku lektora: ${jo.vo_path}`); return setImmediate(pump); }
+  // ready voice-over: cut every silence and 1.12x exactly once (same tool as a recorded one), word times, the text for the log and analysis
+  const sh = ready ? [
+    'set -e', 'cd "$JOB"', 'mkdir -p work project/assets',
+    `cp "${jo.vo_path.replace(/"/g, '')}" raw.wav`,
+    `${cut} > work/tts.log 2>&1 || echo "CIECIE: FAIL po 2 nagraniach, idzie ostatnie" >> work/tts.log`,
+    'test -s vo.wav',
+    'ffmpeg -y -loglevel error -i vo.wav -af "silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0" vo0.wav && mv vo0.wav vo.wav',
+    'python3 "$KIT/tools/words.py" vo.wav words.json >> work/tts.log 2>&1',
+    `python3 -c 'import json; w=json.load(open("words.json")); w=w if isinstance(w,list) else w.get("words",[]); open("tts.txt","w").write(" ".join(str(x.get("w") or x.get("word") or "").strip() for x in w))'`,
+    'ffmpeg -y -loglevel error -i vo.wav -b:a 160k project/assets/vo.mp3',
+  ].join('\n') : [
+    'set -e', 'cd "$JOB"', 'mkdir -p work project/assets',
+    // how to speak, from the script writer (a separate TTS field, never read aloud); Gemini tags stay in tts.txt
+    `STYL="$(python3 -c 'import json; print(str(json.load(open("skrypt.json")).get("styl_lektora", ""))[:300])' 2>/dev/null || true)"`,
+    `python3 "$KIT/tools/tts.py" tts.txt raw.wav ${voice} "$STYL" > work/tts.log 2>&1`,
+    // a cut FAIL (e.g. one pause a few ms too long) gets one fresh take, then the better-than-nothing file goes on
+    `if ! ${cut} >> work/tts.log 2>&1; then echo "CIECIE: FAIL, nagrywam ponownie" >> work/tts.log`,
+    `  python3 "$KIT/tools/tts.py" tts.txt raw.wav ${voice} "$STYL" >> work/tts.log 2>&1`,
+    `  ${cut} >> work/tts.log 2>&1 || echo "CIECIE: FAIL po 2 nagraniach, idzie ostatnie" >> work/tts.log`,
+    'fi', 'test -s vo.wav',
+    // the voice starts on the very first millisecond: no silence before the first word, whatever the cut left
+    'ffmpeg -y -loglevel error -i vo.wav -af "silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0" vo0.wav && mv vo0.wav vo.wav',
+    'python3 "$KIT/tools/words.py" vo.wav words.json >> work/tts.log 2>&1',
+    'python3 "$KIT/tools/caps.py" caps.txt words.json caps.json >> work/tts.log 2>&1',
+    'ffmpeg -y -loglevel error -i vo.wav -b:a 160k project/assets/vo.mp3',
+  ].join('\n');
+  const child = spawn('bash', ['-c', sh], { cwd: dir, env: agentEnv(job, dir, lib), stdio: ['ignore', 'ignore', 'pipe'], detached: true });
+  child.jobId = job.id;
+  running.set(job.id, child);
+  setJob(job.id, { status: 'running', pid: child.pid });
+  setPhase(job.id, 'voice', ready ? 'Automat tnie gotowego lektora i liczy czasy słów' : 'Automat nagrywa lektora i układa napisy');
+  log(job.id, ready ? `Lektor gotowy (${jo.vo_path.split('/').pop()}): cięcie ciszy, tempo 1,12x i czasy słów` : `Lektor: Gemini ${voice}, potem cięcie ciszy, czasy słów i napisy`);
+  let err = '';
+  child.stderr.on('data', (c) => { err = (err + c).slice(-1000); });
+  child.on('close', (code) => {
+    running.delete(job.id);
+    const j = getJob(job.id);
+    if (!j || j.status === 'canceled') return setImmediate(pump);
+    let tail = ''; try { tail = readFileSync(join(dir, 'work', 'tts.log'), 'utf8').trim().split('\n').slice(-3).join(' '); } catch {}
+    if (code !== 0) { failJob(job.id, `TTS niedostępny: ${(tail || err).slice(0, 400)}`); return setImmediate(pump); }
+    const d = probe(join(dir, 'vo.wav'))?.duration || 0, lo = secs - 3, hi = secs + 3, o = optsOf(j), round = Number(o.round) || 0;
+    const words = readFileSync(join(dir, 'tts.txt'), 'utf8').trim().split(/\s+/).length;
+    if (ready) {
+      // the recording is final: its length is the film's length, nothing goes back to a writer
+      writeFileSync(join(dir, 'lektor.json'), JSON.stringify({ sekundy: d, slowa: words, gotowy: true }, null, 1));
+      const cutFail = /CIECIE: FAIL/.test(readFileSync(join(dir, 'work', 'tts.log'), 'utf8'));
+      log(job.id, `Lektor gotowy: ${d} s po cięciu i 1,12x, ${words} słów${cutFail ? '. Uwaga: cięcie ciszy dało FAIL (szczegóły w work/tts.log)' : ''}`);
+      return runStage(getJob(job.id), channelKitFile(ch.agent_kit, 'hook') || !ch.agent_kit ? 'hook' : 'motion');
+    }
+    writeFileSync(join(dir, 'lektor.json'), JSON.stringify({ sekundy: d, cel: [lo, hi], slowa: words }, null, 1));
+    const cutFail = /CIECIE: FAIL po 2/.test(readFileSync(join(dir, 'work', 'tts.log'), 'utf8'));
+    log(job.id, `Lektor gotowy: ${d} s (cel ${lo}-${hi} s), ${words} słów${cutFail ? '. Uwaga: cięcie ciszy dało FAIL w obu nagraniach (szczegóły w work/tts.log)' : ''}`);
+    // one length fix goes back through the writer and the reviewer; after that the film is made with what there is
+    if ((d < lo || d > hi) && !o.lenFix && round < MAX_SCRIPT_ROUNDS + 1) {
+      const delta = Math.round(words * ((d < lo ? lo + 1 : hi - 1) / d - 1));
+      writeFileSync(join(dir, 'lektor.json'), JSON.stringify({ sekundy: d, cel: [lo, hi], slowa: words, zmien_o_slow: delta,
+        uwaga: d > hi ? `Lektor za długi: skróć o ok. ${-delta} słów, nie zmieniając historii.` : `Lektor za krótki: dopisz ok. ${delta} słów w historii.` }, null, 1));
+      setOpts(job.id, { lenFix: true, round: round + 1 });
+      log(job.id, `Długość poza celem: wraca do pisarza (${delta > 0 ? '+' : ''}${delta} słów)`);
+      return runStage(getJob(job.id), 'write');
+    }
+    return runStage(getJob(job.id), 'hook');
+  });
+}
+
+function agentEnv(job, dir, lib) {
   const env = {
     PATH: process.env.GEN_PATH || process.env.PATH, HOME: process.env.GEN_HOME || process.env.HOME, LANG: 'C.UTF-8',
     // a local Claude Code login lives in the macOS keychain, which needs the user identity
     USER: process.env.USER || '', LOGNAME: process.env.LOGNAME || process.env.USER || '',
     OPENROUTER_API_KEY: process.env.GEN_OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY,
     ...(process.env.PEXELS_API_KEY ? { PEXELS_API_KEY: process.env.PEXELS_API_KEY } : {}),
-    KIT, JOB: dir, CUTOUT_LIBRARY: lib, CUTOUT_FILM_BUDGET: process.env.CUTOUT_FILM_BUDGET || '0.05',
+    KIT, JOB: dir, CUTOUT_LIBRARY: lib, CUTOUT_FILM_BUDGET: process.env.CUTOUT_FILM_BUDGET || '0.12',
     ...(process.env.WHISPER_CPP_MODEL ? { WHISPER_CPP_MODEL: process.env.WHISPER_CPP_MODEL } : {}),
     ...(process.env.XDG_CACHE_HOME ? { XDG_CACHE_HOME: process.env.XDG_CACHE_HOME } : {}),
   };
@@ -408,15 +776,31 @@ function launch(job) {
     // headless Claude Code: local login (HOME keychain) or GEN_ANTHROPIC_API_KEY on a server
     const key = process.env.GEN_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
     if (key) env.ANTHROPIC_API_KEY = key;
+    // every turn re-sends the whole context: no claude.ai connectors (Gmail, Docs...) and no extra tools,
+    // and a render may block for up to 15 min in one call instead of being polled turn after turn
+    env.ENABLE_CLAUDEAI_MCP_SERVERS = 'false';
+    env.BASH_DEFAULT_TIMEOUT_MS = '900000';
+    env.BASH_MAX_TIMEOUT_MS = '1800000';
   }
+  return env;
+}
+
+// the writer, the reviewer and the hook director run on the lighter model; only the animator gets the job's model (Opus)
+const LIGHT_STAGES = new Set((process.env.GEN_LIGHT_STAGES ?? 'write,review,hook').split(',').map(x => x.trim()).filter(Boolean));
+const stageModel = (job, stage) => (LIGHT_STAGES.has(stage) ? (process.env.GEN_LIGHT_MODEL || 'sonnet') : (job.model.split('/')[1] || 'sonnet'));
+function spawnAgent(job, dir, lib, resumeSid, stage = 'motion') {
+  const o0 = optsOf(job);
+  const prompt = o0.critique || agentPrompt(resumeSid, stage, Number(o0.round) || 0), env = agentEnv(job, dir, lib), engine = engineOf(job.model);
+  if (o0.critique) setOpts(job.id, { critique: null });
   const args = engine === 'claude'
     // the prompt goes right after -p: --add-dir is variadic and would swallow a trailing argument
-    ? ['-p', prompt, '--setting-sources', 'project,local', '--output-format', 'stream-json', '--verbose', '--dangerously-skip-permissions', '--model', job.model.split('/')[1] || 'sonnet', '--add-dir', KIT]
+    ? ['-p', prompt, '--setting-sources', 'project,local', '--output-format', 'stream-json', '--verbose', '--dangerously-skip-permissions', '--model', stageModel(job, stage),
+      '--strict-mcp-config', '--tools', 'Bash,Read,Write,Edit', '--disable-slash-commands', ...(resumeSid ? ['--resume', resumeSid] : []), '--add-dir', KIT]
     : ['run', '--format', 'json', '--auto', '--dir', dir, '--title', `tsc-job-${job.id}`, '-m', job.model || DEFAULT_MODEL, prompt];
   let cmd = engine === 'claude' ? claudeBin() : opencodeBin(), rest = args, spawnEnv = env;
   if (SANDBOX === 'docker') {
     // same paths inside and outside, so the prompt and the files agree; kit is read-only
-    const pass = ['OPENROUTER_API_KEY', 'KIT', 'JOB', 'CUTOUT_LIBRARY', 'CUTOUT_FILM_BUDGET', ...(env.ANTHROPIC_API_KEY ? ['ANTHROPIC_API_KEY'] : []), ...(env.PEXELS_API_KEY ? ['PEXELS_API_KEY'] : [])];
+    const pass = ['OPENROUTER_API_KEY', 'KIT', 'JOB', 'CUTOUT_LIBRARY', 'CUTOUT_FILM_BUDGET', ...(env.BASH_MAX_TIMEOUT_MS ? ['ENABLE_CLAUDEAI_MCP_SERVERS', 'BASH_DEFAULT_TIMEOUT_MS', 'BASH_MAX_TIMEOUT_MS'] : []), ...(env.ANTHROPIC_API_KEY ? ['ANTHROPIC_API_KEY'] : []), ...(env.PEXELS_API_KEY ? ['PEXELS_API_KEY'] : [])];
     rest = ['run', '--rm', '--name', `tsc-job-${job.id}`, '--memory', process.env.GEN_DOCKER_MEMORY || '2g', '--cpus', process.env.GEN_DOCKER_CPUS || '3',
       '--pids-limit', '512', '--security-opt', 'no-new-privileges',
       '-v', `${dir}:${dir}`, '-v', `${KIT}:${KIT}:ro`, '-v', `${lib}:${lib}`, '-w', dir,
@@ -427,11 +811,17 @@ function launch(job) {
   const child = spawn(cmd, rest, { cwd: dir, env: spawnEnv, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   child.jobId = job.id;
   running.set(job.id, child);
-  setJob(job.id, { status: 'running', started_at: nowIso(), pid: child.pid });
-  setPhase(job.id, 'plan', 'Agent czyta pipeline i planuje film');
-  log(job.id, `Start: ${engine === 'claude' ? 'Claude Code' : 'opencode'}, model ${job.model}`);
+  setJob(job.id, { status: 'running', started_at: job.started_at || nowIso(), pid: child.pid });
+  const round = Number(optsOf(job).round) || 0;
+  const who = { write: round ? `Pisarz poprawia skrypt po recenzji (runda ${round + 1})` : 'Pisarz pisze skrypt', review: 'Recenzent sprawdza skrypt', hook: 'Reżyser układa pierwszą klatkę i storyboard 0-5 s', motion: 'Animator planuje sceny od pierwszej klatki' }[stage];
+  setPhase(job.id, { write: 'script', review: 'review', hook: 'hook', motion: 'plan' }[stage], who);
+  log(job.id, `${resumeSid ? 'Wznowienie' : 'Start'} (${who}): ${engine === 'claude' ? 'Claude Code' : 'opencode'}, model ${engine === 'claude' ? 'claude/' + stageModel(job, stage) : job.model}`);
 
-  let buf = '', lastText = '', cost = 0, tin = 0, tout = 0, turns = 0;
+  // every stage keeps counting from what the job already used
+  let buf = '', lastText = '', cost = 0, tin = 0, tout = 0, turns = 0, resultError = false;
+  const base = { cost: job.cost_usd || 0, tin: job.tokens_in || 0, tout: job.tokens_out || 0, turns: job.turns || 0 };
+  // the bar follows the agent's own activity only in the motion stage (it also reads tts.txt, which is not a step back)
+  const activity = (what) => { const ph = stage === 'motion' ? phaseFromActivity(what) : null; if (ph && !['script', 'voice'].includes(ph[0])) setPhase(job.id, ph[0], ph[1]); };
   const limit = fmtOf(job) === 'short' ? TIMEOUT_MS : TIMEOUT_MS * 2.5;
   const timer = setTimeout(() => { log(job.id, `Przekroczony limit czasu (${Math.round(limit / 60000)} min), zatrzymuję.`); killTree(child); }, limit);
   child.stdout.on('data', (chunk) => {
@@ -449,12 +839,11 @@ function launch(job) {
         const i = part.state?.input || {};
         const what = i.command || i.filePath || i.file_path || i.path || '';
         log(job.id, `${part.tool || 'narzędzie'}: ${String(what).replace(/\s+/g, ' ').slice(0, 160)}`);
-        const ph = phaseFromActivity(what);
-        if (ph) setPhase(job.id, ph[0], ph[1]);
+        activity(what);
       } else if (ev.type === 'step_finish') {
         turns += 1; cost += Number(part.cost) || 0;
         tin += part.tokens?.input || 0; tout += (part.tokens?.output || 0) + (part.tokens?.reasoning || 0);
-        setJob(job.id, { cost_usd: cost, tokens_in: tin, tokens_out: tout, turns });
+        setJob(job.id, { cost_usd: base.cost + cost, tokens_in: base.tin + tin, tokens_out: base.tout + tout, turns: base.turns + turns });
       } else if (ev.type === 'error') {
         const d = ev.error?.data || {};
         lastText = d.message || ev.error?.message || 'błąd dostawcy modelu';
@@ -472,18 +861,17 @@ function launch(job) {
           const i = b.input || {};
           const what = i.command || i.file_path || i.path || i.pattern || '';
           log(job.id, `${b.name}: ${String(what).replace(/\s+/g, ' ').slice(0, 160)}`);
-          const ph = phaseFromActivity(what);
-          if (ph) setPhase(job.id, ph[0], ph[1]);
+          activity(what);
         }
       }
       const u = ev.message.usage;
       if (u) { tin += (u.input_tokens || 0) + (u.cache_read_input_tokens || 0); tout += u.output_tokens || 0; }
-      setJob(job.id, { tokens_in: tin, tokens_out: tout, turns });
+      setJob(job.id, { tokens_in: base.tin + tin, tokens_out: base.tout + tout, turns: base.turns + turns });
     } else if (ev.type === 'result') {
       cost = Number(ev.total_cost_usd) || cost;
       if (ev.result) lastText = String(ev.result).trim();
-      if (ev.is_error) log(job.id, 'Błąd: ' + lastText.slice(0, 300));
-      setJob(job.id, { cost_usd: cost, turns: ev.num_turns || turns });
+      if (ev.is_error) { resultError = true; log(job.id, 'Błąd: ' + lastText.slice(0, 300)); }
+      setJob(job.id, { cost_usd: base.cost + cost, turns: base.turns + (ev.num_turns || turns) });
     }
   }
   let errTail = '';
@@ -492,11 +880,21 @@ function launch(job) {
   child.on('close', (code) => {
     clearTimeout(timer);
     running.delete(job.id);
-    try { finish(job.id, code, lastText, errTail); } catch (e) {
+    if ((code !== 0 || resultError) && parkOnLimit(job.id, stage, `${lastText}\n${errTail}`)) return setImmediate(pump);
+    try { afterStage(job.id, stage, code, lastText, errTail); } catch (e) {
       setJob(job.id, { status: 'error', error: String(e.message || e).slice(0, 500), finished_at: nowIso() });
     }
     setImmediate(pump);
   });
+}
+
+/** Milliseconds of silence before the first sound of a file's audio (0 = the voice starts on the first millisecond). */
+export function audioStartMs(file) {
+  try {
+    const r = spawnSync('ffmpeg', ['-hide_banner', '-t', '2', '-i', file, '-af', 'silencedetect=n=-45dB:d=0.001', '-f', 'null', '-'], { encoding: 'utf8' });
+    const st = r.stderr.match(/silence_start: ([\d.e-]+)/), en = r.stderr.match(/silence_end: ([\d.]+)/);
+    return st && Number(st[1]) <= 0.001 && en ? Math.round(Number(en[1]) * 1000) : 0;
+  } catch { return null; }
 }
 
 function probe(file) {
@@ -518,10 +916,15 @@ function finish(id, code, lastText, errTail) {
     log(id, 'Nie udało się: ' + msg.slice(0, 300));
     if (job.queue_id) db.prepare("UPDATE queue SET status='idea', updated_at=? WHERE id=? AND status='render'").run(nowIso(), job.queue_id);
   };
+  // an agent that copied to the wrong folder still made a film: take its render instead of failing the job
+  const rendered = join(dir, 'project', 'renders', 'film.mp4');
+  if (!existsSync(file) && existsSync(rendered)) { copyFileSync(rendered, file); log(id, 'Brak final.mp4 w folderze zadania, biorę project/renders/film.mp4'); }
   if (!existsSync(file)) return fail(lastText || errTail.trim().split('\n').pop() || `agent zakończył pracę bez pliku final.mp4 (kod ${code})`);
   const p = probe(file);
   if (!p?.video) return fail('final.mp4 nie jest poprawnym plikiem wideo');
   if (!p.audio) return fail('final.mp4 nie ma ścieżki dźwiękowej');
+  const lead = audioStartMs(file);
+  log(id, lead == null ? 'Start lektora: nie udało się zmierzyć' : `Start lektora w MP4: ${lead} ms${lead > 40 ? ' (UWAGA: cisza na początku, cel 0 ms)' : ' (OK, głos od pierwszej chwili)'}`);
   setPhase(id, 'deliver', 'Dodaję film do Studia');
   let meta = {};
   try { meta = JSON.parse(readFileSync(join(dir, 'meta.json'), 'utf8')); } catch {}
@@ -544,8 +947,60 @@ function finish(id, code, lastText, errTail) {
   setJob(id, { status: 'done', phase: 'done', phase_detail: 'Film gotowy', video_id: videoId, finished_at: nowIso() });
   log(id, `Gotowe: "${title}", ${p.duration} s, koszt modelu ok. ${job.cost_usd.toFixed(3)} USD`);
   // keep the sources for a while (debugging, re-render), drop heavy temporary files now
-  for (const junk of ['project/node_modules', 'project/snapshots', 'project/renders', 'node_modules', 'raw.wav', 'cut.wav']) rmSync(join(dir, junk), { recursive: true, force: true });
+  // copies of the 3D models and the isolated render copy are rebuilt from the skill when needed
+  for (const junk of ['project/node_modules', 'project/renders', 'node_modules', 'raw.wav', 'cut.wav', 'project/model', 'work/render']) rmSync(join(dir, junk), { recursive: true, force: true });
 }
+
+// ---- usage limit: park the job and wake it up by itself -----------------------------------------
+const LIMIT_RE = /usage limit|hit your limit|limit reached|limit will reset|resets? (at )?\d|rate.?limit|overloaded|too many requests|\b429\b|\b529\b/i;
+const LIMIT_RETRY_MIN = Number(process.env.GEN_LIMIT_RETRY_MIN || 30);   // when the message gives no reset time, look again after this long
+const LIMIT_MAX_RETRIES = Number(process.env.GEN_LIMIT_MAX_RETRIES || 24);   // about 12 h of waiting, then it is a real error
+
+/** When the limit lifts, read from the agent's message (epoch after "|", or "resets 3pm"); null = not stated. */
+function limitResetAt(text) {
+  const ep = text.match(/limit reached\|(\d{10})/i);
+  if (ep) return new Date(Number(ep[1]) * 1000);
+  const m = text.match(/resets?\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (!m) return null;
+  let h = Number(m[1]); const min = Number(m[2] || 0), ap = (m[3] || '').toLowerCase();
+  if (ap === 'pm' && h < 12) h += 12; if (ap === 'am' && h === 12) h = 0;
+  if (h > 23) return null;
+  const d = new Date(); d.setHours(h, min, 0, 0);   // the message is in the server's local time
+  if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+  return d;
+}
+
+/**
+ * The agent stopped on a usage/rate limit: do not fail the job. It waits (status "held") with its own session
+ * kept and is put back in the queue by limitWatcher once the limit lifts, so nobody has to click "Wznów".
+ */
+function parkOnLimit(id, stage, text) {
+  const job = getJob(id);
+  if (!job || job.status === 'canceled' || engineOf(job.model) !== 'claude' || !LIMIT_RE.test(text)) return false;
+  const o = optsOf(job), tries = (Number(o.limitRetries) || 0) + 1;
+  if (tries > LIMIT_MAX_RETRIES) return false;
+  const sid = stage !== 'tts' ? claudeSessionOf(jobDir(job)) : null;
+  const at = new Date((limitResetAt(text)?.getTime() || Date.now() + LIMIT_RETRY_MIN * 60_000) + 60_000);   // a minute after the reset
+  const hhmm = at.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Warsaw' });
+  setOpts(id, { stage, resume: sid || 'restart-stage', limitRetries: tries, limitResumeAt: at.toISOString() });
+  setJob(id, { status: 'held', phase_detail: `Limit użycia: wznowię sam o ${hhmm}`, pid: null });
+  log(id, `Limit użycia modelu. Zadanie czeka i samo wróci do pracy o ${hhmm} (próba ${tries}/${LIMIT_MAX_RETRIES}), ta sama sesja agenta.`);
+  return true;
+}
+
+/** Every minute: jobs parked on a limit whose time has come go back to the front of the queue. */
+function limitWatcher() {
+  const now = Date.now();
+  for (const j of db.prepare("SELECT id, opts, queue_id FROM gen_jobs WHERE status='held'").all()) {
+    let at = null; try { at = JSON.parse(j.opts || '{}').limitResumeAt; } catch {}
+    if (!at || new Date(at).getTime() > now) continue;
+    setOpts(j.id, { limitResumeAt: null });
+    setJob(j.id, { status: 'queued', phase: 'queued', phase_detail: 'Wznowienie po limicie', error: null, finished_at: null, queued_at: nowIso() });
+    log(j.id, 'Limit minął: wznawiam pracę od miejsca przerwania');
+  }
+  setImmediate(pump);
+}
+export function startLimitWatcher() { setInterval(limitWatcher, 60_000).unref(); limitWatcher(); }
 
 /**
  * On boot: a job that was running when the server stopped cannot be followed any more. It goes back
@@ -558,6 +1013,8 @@ export function recoverJobs() {
     if (retried) {
       setJob(j.id, { status: 'error', error: 'Przerwane restartem serwera dwa razy. Uruchom generowanie ponownie.', finished_at: nowIso() });
       if (j.queue_id) db.prepare("UPDATE queue SET status='idea' WHERE id=? AND status='render'").run(j.queue_id);
+    } else if (resumeJob(db.prepare('SELECT workspace_id FROM gen_jobs WHERE id=?').get(j.id).workspace_id, j.id)) {
+      log(j.id, 'Ponowny start po restarcie serwera');
     } else {
       rmSync(join(GEN_DIR, String(db.prepare('SELECT workspace_id FROM gen_jobs WHERE id=?').get(j.id).workspace_id), `job-${j.id}`), { recursive: true, force: true });
       setJob(j.id, { status: 'queued', phase: 'queued', phase_detail: '', pid: null, started_at: null, cost_usd: 0, turns: 0 });

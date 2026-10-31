@@ -4,6 +4,8 @@
   python3 cutout.py "różowy mózg trzymający dyskietkę" assets/cut-mozg.png [--style sticker|photo|paper|clay] [--key green|magenta]
   python3 cutout.py --from-image zdjecie.png assets/cut-x.png        # tylko wycięcie tła z gotowego obrazka (darmowe)
   python3 cutout.py --budget assets                                  # ile ten film już wydał
+  python3 cutout.py --scene "studentka śpi na otwartym podręczniku, 3 w nocy" assets/scena-1.jpg [--style photo|paper|clay|sticker]
+                                                                     # PEŁNY kadr 9:16 z tłem (otwarcie filmu), bez wycinania
 
 Generuje przez OpenRouter (najtańszy działający model z listy MODELS) obiekty na płaskim zielonym tle, wycina tło
 floodfillem od krawędzi (miękka krawędź + usunięcie zielonej poświaty), przycina do obiektu. Tryb --sheet rysuje
@@ -43,6 +45,18 @@ def bg_words(key):
 
 def single_prompt(subject, style, key):
     return STYLES[style].format(s=subject) + ". Centered, the object fills about 80% of the square frame, isolated on a " + bg_words(key)
+
+SCENE = {
+    "photo": "Candid realistic smartphone photo, natural light, real everyday place, slight grain, looks like a real TikTok video frame",
+    "paper": "Paper-cut collage scene, layered colored paper with visible texture",
+    "clay": "Cute 3D clay diorama, soft studio light, rounded shapes",
+    "sticker": "Bold flat vector illustration, vivid saturated colors, simple readable shapes",
+}
+
+def scene_prompt(subject, style):
+    return (f"{SCENE[style]}. Vertical 9:16 full-frame scene: {subject}. One clear subject, instantly recognizable at a glance, "
+            "the situation fills the whole frame edge to edge (no empty background, no border). Keep the top 15% and bottom 25% calm "
+            "(no faces or key details there). No text, no letters, no logos, no watermark.")
 
 def sheet_prompt(subjects, style, key):
     n = len(subjects)
@@ -248,6 +262,13 @@ def slug(t):
     t = t.lower().translate(str.maketrans("ąćęłńóśźż", "acelnoszz"))
     return "-".join("".join(ch if ch.isalnum() else " " for ch in t).split())[:40] or "obiekt"
 
+def sheet_dst(folder, sub, h, seen):
+    # subjects that share a long common start would get the same slug: keep every file
+    name = f"cut-{slug(sub)}.png"
+    if name in seen: name = f"cut-{slug(sub)}-{h[:6]}.png"
+    seen.add(name)
+    return os.path.join(folder, name)
+
 def lib_key(style, key, subject):
     return hashlib.sha1(f"{style}|{key}|{' '.join(subject.lower().split())}".encode()).hexdigest()[:16]
 
@@ -262,8 +283,9 @@ def sheet(o):
     film = film_of(os.path.join(o.out, "x.png"))
     idx_f, idx = load_idx()
     res, todo = [], []
+    seen, dsts = set(), {}
     for sub in subjects:   # library first: anything already drawn costs nothing
-        h = lib_key(o.style, o.key, sub); dst = os.path.join(o.out, f"cut-{slug(sub)}.png")
+        h = lib_key(o.style, o.key, sub); dst = dsts[sub] = sheet_dst(o.out, sub, h, seen)
         if h in idx and os.path.exists(idx[h]["file"]) and not o.no_cache:
             shutil.copy(idx[h]["file"], dst); res.append({"subject": sub, "file": dst, "source": "biblioteka"})
         else: todo.append(sub)
@@ -276,7 +298,7 @@ def sheet(o):
         parts = split_sheet(full, len(todo))
         shutil.move(raw, os.path.join(LIB, f"sheet-{int(t)}.png"))   # raw sheet stays in the library (debug, re-cut for free)
         for sub, im in zip(todo, parts):
-            dst = os.path.join(o.out, f"cut-{slug(sub)}.png")
+            dst = dsts[sub]
             if im is None: res.append({"subject": sub, "file": None, "source": "BRAK (model nie narysował, dodaj do następnego arkusza)"}); continue
             h = lib_key(o.style, o.key, sub); lib_png = os.path.join(LIB, f"{h}.png"); im.save(lib_png); shutil.copy(lib_png, dst)
             idx[h] = {"subject": sub, "style": o.style, "key": o.key, "file": lib_png, "model": model, "cost": round(cost / len(todo), 4), "created": time.strftime("%Y-%m-%d %H:%M"), "sheet": True}
@@ -285,6 +307,25 @@ def sheet(o):
     print(json.dumps({"model": model, "cost": cost, "film_spent": spent(film), "budget": BUDGET, "items": res}, ensure_ascii=False, indent=1))
     print("OBEJRZYJ każdy PNG: arkusz bywa pocięty źle (dwa obiekty w jednym pliku, ucięty obiekt).", file=sys.stderr)
 
+def scene(o):
+    os.makedirs(os.path.dirname(os.path.abspath(o.out)), exist_ok=True); os.makedirs(LIB, exist_ok=True)
+    idx_f, idx = load_idx()
+    h = lib_key("scene-" + o.style, "none", o.scene)
+    if h in idx and os.path.exists(idx[h]["file"]) and not o.no_cache:
+        shutil.copy(idx[h]["file"], o.out)
+        print(json.dumps({"file": os.path.abspath(o.out), "source": "biblioteka", "cost": 0}, ensure_ascii=False)); return
+    data, model, cost = generate(scene_prompt(o.scene, o.style), film_of(o.out))
+    raw = os.path.join(LIB, f"{h}-raw.png"); open(raw, "wb").write(data)
+    im = Image.open(raw).convert("RGB")
+    # cover-crop to 9:16, 1080x1920
+    W, H = im.size; tw = min(W, round(H * 9 / 16)); th = min(H, round(W * 16 / 9))
+    im = im.crop(((W - tw) // 2, (H - th) // 2, (W - tw) // 2 + tw, (H - th) // 2 + th)).resize((1080, 1920), Image.LANCZOS)
+    lib_jpg = os.path.join(LIB, f"{h}.jpg"); im.save(lib_jpg, quality=90); os.remove(raw)
+    shutil.copy(lib_jpg, o.out)
+    idx[h] = {"subject": o.scene, "style": "scene-" + o.style, "key": "none", "file": lib_jpg, "model": model, "cost": cost, "created": time.strftime("%Y-%m-%d %H:%M")}
+    json.dump(idx, open(idx_f, "w"), ensure_ascii=False, indent=1)
+    print(json.dumps({"file": os.path.abspath(o.out), "source": "nowa", "model": model, "cost": cost, "film_spent": spent(film_of(o.out))}, ensure_ascii=False))
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("subject", nargs="?"); p.add_argument("out")
@@ -292,10 +333,12 @@ def main():
     p.add_argument("--from-image"); p.add_argument("--no-cache", action="store_true")
     p.add_argument("--sheet", help="do 9 obiektów rozdzielonych średnikiem; 'out' to wtedy folder")
     p.add_argument("--budget", action="store_true", help="pokaż wydatki filmu (out = dowolna ścieżka w filmie)")
+    p.add_argument("--scene", help="opis pełnej sceny 9:16 (z tłem, bez wycinania); 'out' to plik .jpg")
     o = p.parse_args()
     if o.budget:
         film = film_of(o.out); print(json.dumps({"film": film, "spent": spent(film), "budget": BUDGET, "calls": ledger()[1]["films"].get(film, [])}, ensure_ascii=False, indent=1)); return
     if o.sheet: return sheet(o)
+    if o.scene: return scene(o)
     os.makedirs(os.path.dirname(os.path.abspath(o.out)), exist_ok=True)
     if o.from_image:
         res, kept = cut(Image.open(o.from_image)); res.save(o.out)

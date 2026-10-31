@@ -115,3 +115,83 @@ export function csvToVideos(text) {
   }).filter(v => v.title);
   return { videos, map: Object.fromEntries(Object.entries(map).map(([k, i]) => [k, header[i]])) };
 }
+
+// ---- TikTok Studio "Export videos" (one row per post, with retention and traffic sources) ----
+// Columns are found by name, so a reordered export still reads. Percent lists look like
+// "For You: 83.3%\nPersonal Profile: 16.7%" and the retention column like "0s: 100%\n1s: 88%".
+const pctList = (s) => {
+  const out = {};
+  for (const line of String(s || '').split(/\r?\n/)) {
+    const m = line.match(/^\s*(.+?)\s*:\s*([0-9.,]+)\s*%?\s*$/);
+    if (m) out[m[1].trim()] = parseFloat(m[2].replace(',', '.'));
+  }
+  return out;
+};
+const curve = (s) => Object.entries(pctList(s)).map(([k, v]) => [parseInt(k, 10), v]).filter(([k]) => Number.isFinite(k)).sort((a, b) => a[0] - b[0]).map(([, v]) => v);
+const tsOf = (s) => {
+  const m = String(s || '').match(/(\d{1,2})\.(\d{1,2})\.(\d{4}),?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}T${m[4].padStart(2, '0')}:${m[5]}:${m[6] || '00'}`;
+  const d = toDate(s);
+  return d ? d + 'T00:00:00' : '';
+};
+
+export function isTiktokExport(text) {
+  const head = norm(parseCsv(String(text || '').slice(0, 4000))[0]?.join(' '));
+  return head.includes('video id') && (head.includes('audience retention') || head.includes('video views'));
+}
+
+/** TikTok Studio export -> one object per post. */
+export function tiktokExportPosts(text) {
+  const rows = parseCsv(text);
+  if (rows.length < 2) return [];
+  const h = rows[0].map(norm);
+  const col = (...names) => { for (const n of names) { const i = h.indexOf(n); if (i >= 0) return i; } return -1; };
+  const c = {
+    caption: col('video caption'), posted: col('posted date'), id: col('video id'), url: col('video url'), views: col('video views'),
+    likes: col('like count'), comments: col('comment count'), shares: col('share count'), saves: col('favorites count'), reach: col('reach'),
+    duration: col('video duration'), total: col('total time watched'), avg: col('average time watched'), full: col('watched full video rate'),
+    followers: col('new followers'), profile: col('profile views'), traffic: col('traffic source'), viewers: col('viewer types'), retention: col('audience retention'),
+  };
+  const g = (r, k) => (c[k] < 0 ? '' : String(r[c[k]] ?? '').trim());
+  // the export always writes plain decimals ("46.709" s), never thousands separators
+  const n = (r, k) => { const v = parseFloat(g(r, k).replace(',', '.')); return Number.isFinite(v) ? v : 0; };
+  return rows.slice(1).map(r => {
+    const tr = pctList(g(r, 'traffic')), vw = pctList(g(r, 'viewers'));
+    const full = n(r, 'full');
+    const cap = g(r, 'caption');
+    return {
+      tiktok_id: g(r, 'id').replace(/\D/g, ''), url: /^https?:\/\//.test(g(r, 'url')) ? g(r, 'url') : '',
+      caption: cap === '-' ? '' : cap, posted_at: tsOf(g(r, 'posted')), duration: n(r, 'duration'),
+      views: Math.round(n(r, 'views')), likes: Math.round(n(r, 'likes')), comments: Math.round(n(r, 'comments')),
+      shares: Math.round(n(r, 'shares')), saves: Math.round(n(r, 'saves')), reached: Math.round(n(r, 'reach')),
+      total_watch_time: n(r, 'total'), avg_watch: n(r, 'avg'), completion: +(full <= 1 ? full * 100 : full).toFixed(2),
+      followers: Math.round(n(r, 'followers')), profile_views: Math.round(n(r, 'profile')),
+      src_fyp: tr['For You'] || 0, src_profile: tr['Personal Profile'] || 0, src_following: tr['Follow'] || 0, src_search: tr['Search'] || 0, src_sound: tr['Sound'] || 0,
+      new_viewers: vw.NEW_VIEWER || 0, returning_viewers: vw.RETURN_VIEWER || 0, retention: curve(g(r, 'retention')),
+    };
+  }).filter(p => p.tiktok_id);
+}
+
+/** Which Studio film a post is. Strongest evidence first; a duration guess only when exactly one film
+ *  of the export's channel fits (other channels share lengths like 41 s too often). */
+export function matchPost(p, videos, channelId) {
+  const slug = (s) => norm(String(s || '').replace(/ł/g, 'l').replace(/Ł/g, 'L')).replace(/ /g, '-');
+  const byUrl = videos.find(v => v.url && v.url.includes(p.tiktok_id));
+  if (byUrl) return { video: byUrl, how: 'link' };
+  const cap = norm(p.caption);
+  if (cap.length > 20) {
+    const v = videos.find(v => v.caption && norm(v.caption).slice(0, 60) === cap.slice(0, 60));
+    if (v) return { video: v, how: 'opis' };
+  }
+  if (p.caption && /^[a-z0-9-]+$/.test(p.caption)) {   // uploaded file name kept as the caption
+    const v = videos.find(v => slug(v.title) === p.caption || v.ref === p.caption);
+    if (v) return { video: v, how: 'nazwa pliku' };
+  }
+  if (p.duration > 0) {
+    const posted = Date.parse(p.posted_at) || Infinity;
+    const fit = videos.filter(v => (!channelId || v.channel_id === channelId) && v.duration_sec > 0 && Math.abs(v.duration_sec - p.duration) <= 0.15 && Date.parse(v.created_at) <= posted + 3600_000)
+      .sort((a, b) => Math.abs(a.duration_sec - p.duration) - Math.abs(b.duration_sec - p.duration));
+    if (fit.length === 1 || (fit.length > 1 && Math.abs(fit[1].duration_sec - p.duration) - Math.abs(fit[0].duration_sec - p.duration) > 0.1)) return { video: fit[0], how: 'długość' };
+  }
+  return null;
+}

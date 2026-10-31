@@ -12,14 +12,14 @@ import { analyze } from './analysis.js';
 import { sendMail, emailShell, esc, mailerReady } from './mailer.js';
 import { startScheduler, buildDailyDigest, buildWeeklyReport, localParts } from './scheduler.js';
 import { parseSetup, cleanSetup, aiReady, MODELS, DEFAULT_MODEL } from './ai.js';
-import { zonedToUtc, validTimezone, csvToVideos } from './importers.js';
+import { zonedToUtc, validTimezone, csvToVideos, isTiktokExport, tiktokExportPosts, matchPost } from './importers.js';
 import { listMusic, musicSettings, saveMusicSettings, addMusicFile, addMusicLink, updateMusic, deleteMusic, getMusic, refreshTrending, aiCurate } from './music.js';
 import { addByLink, listLibrary, searchTikToks, getItem as getInspire, startBreakdown, remixToQueue, deleteItem as deleteInspire, framePath } from './inspire.js';
 import { apifyReady } from './services.js';
 import { BIBLIA_IDS } from './biblia.js';
-import { generatorStatus, styleList, createJob, cancelJob, startHeld, listJobs, jobForWorkspace, usedToday, recoverJobs, estimateMinutes, PHASES, DAILY_LIMIT, MODELS as GEN_MODELS, DEFAULT_MODEL as GEN_DEFAULT } from './generator.js';
+import { generatorStatus, styleList, createJob, cancelJob, resumeJob, retryJob, AGENTS, agentTemplate, agentDefault, startHeld, listJobs, jobForWorkspace, usedToday, recoverJobs, startLimitWatcher, estimateMinutes, PHASES, DAILY_LIMIT, GEN_DIR, MODELS as GEN_MODELS, DEFAULT_MODEL as GEN_DEFAULT } from './generator.js';
 import { chat as agentChat, history as agentHistory, clearHistory as clearAgentHistory, AGENT_MODEL } from './marketing-agent.js';
-import { existsSync, rmSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs';
+import { existsSync, rmSync, mkdirSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -224,7 +224,7 @@ function channelExtras(b, cur) {
   const voice = has('voice') ? String(b.voice) : (cur.voice || 'Puck');
   const len = has('length_sec') ? Math.round(Number(b.length_sec)) : (cur.length_sec || 40);
   return {
-    product: has('product') ? s(b.product, 300) : (cur.product || ''), cta: has('cta') ? s(b.cta, 200) : (cur.cta || ''),
+    product: has('product') ? s(b.product, 300) : (cur.product || ''), product_info: has('product_info') ? s(b.product_info, 4000) : (cur.product_info || ''), cta: has('cta') ? s(b.cta, 200) : (cur.cta || ''),
     colors: has('colors') ? s(b.colors, 200) : (cur.colors || ''), voice: VOICES.includes(voice) ? voice : 'Puck',
     language: has('language') ? (s(b.language, 30) || 'polski') : (cur.language || 'polski'),
     length_sec: Number.isFinite(len) ? Math.min(90, Math.max(20, len)) : 40,
@@ -238,8 +238,8 @@ app.post('/api/channels', wrap((req, res) => {
   const name = s(b.name, 80);
   if (!name) throw httpErr(400, 'Podaj nazwę kanału.');
   const x = channelExtras(b, {});
-  const r = db.prepare('INSERT INTO channels(workspace_id,name,handle,niche,audience,goal,product,cta,colors,voice,language,length_sec,color) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(req.ws.id, name, cleanHandle(b.handle), s(b.niche, 400), s(b.audience, 300), s(b.goal, 300), x.product, x.cta, x.colors, x.voice, x.language, x.length_sec, x.color);
+  const r = db.prepare('INSERT INTO channels(workspace_id,name,handle,niche,audience,goal,product,product_info,cta,colors,voice,language,length_sec,color) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .run(req.ws.id, name, cleanHandle(b.handle), s(b.niche, 400), s(b.audience, 300), s(b.goal, 300), x.product, x.product_info, x.cta, x.colors, x.voice, x.language, x.length_sec, x.color);
   ok(res, { channel: db.prepare('SELECT * FROM channels WHERE id=?').get(r.lastInsertRowid) });
 }));
 app.put('/api/channels/:id', wrap((req, res) => {
@@ -250,10 +250,53 @@ app.put('/api/channels/:id', wrap((req, res) => {
   const name = pick('name', 80);
   if (!name) throw httpErr(400, 'Nazwa kanału nie może być pusta.');
   const x = channelExtras(b, cur);
-  db.prepare('UPDATE channels SET name=?, handle=?, niche=?, audience=?, goal=?, product=?, cta=?, colors=?, voice=?, language=?, length_sec=?, color=? WHERE id=?')
+  db.prepare('UPDATE channels SET name=?, handle=?, niche=?, audience=?, goal=?, product=?, product_info=?, cta=?, colors=?, voice=?, language=?, length_sec=?, color=? WHERE id=?')
     .run(name, 'handle' in b ? cleanHandle(b.handle) : cur.handle, pick('niche', 400), pick('audience', 300), pick('goal', 300),
-      x.product, x.cta, x.colors, x.voice, x.language, x.length_sec, x.color, cur.id);
+      x.product, x.product_info, x.cta, x.colors, x.voice, x.language, x.length_sec, x.color, cur.id);
   ok(res);
+}));
+// ---- product screenshots of a channel (shown to the agent as the real app) --------------------
+const SHOT_DIR = resolve(__dirname, '../data/shots');
+const shotOf = (req) => {
+  const x = db.prepare('SELECT * FROM channel_shots WHERE id=? AND workspace_id=?').get(int(req.params.id), req.ws.id);
+  if (!x) throw httpErr(404, 'Nie ma takiego zrzutu.');
+  return x;
+};
+const imgExt = (buf) => (buf[0] === 0x89 && buf.subarray(1, 4).toString() === 'PNG' ? 'png'
+  : buf[0] === 0xff && buf[1] === 0xd8 ? 'jpg'
+  : buf.subarray(0, 4).toString() === 'RIFF' && buf.subarray(8, 12).toString() === 'WEBP' ? 'webp' : '');
+app.get('/api/channels/:id/shots', wrap((req, res) => {
+  ok(res, { shots: db.prepare('SELECT id, caption, created_at FROM channel_shots WHERE channel_id=? AND workspace_id=? ORDER BY id').all(int(req.params.id), req.ws.id) });
+}));
+app.post('/api/channels/:id/shots', requireUser, rateLimit('shots', 60, 3600_000), express.raw({ type: () => true, limit: '10mb' }), wrap((req, res) => {
+  const ch = db.prepare('SELECT id FROM channels WHERE id=? AND workspace_id=?').get(int(req.params.id), req.ws.id);
+  if (!ch) throw httpErr(404, 'Kanał nie istnieje.');
+  const buf = req.body;
+  const ext = Buffer.isBuffer(buf) && buf.length > 100 ? imgExt(buf) : '';
+  if (!ext) throw httpErr(400, 'Wgraj obraz PNG, JPG albo WEBP.');
+  if (db.prepare('SELECT COUNT(*) c FROM channel_shots WHERE channel_id=?').get(ch.id).c >= 20) throw httpErr(409, 'Kanał ma już 20 zrzutów. Usuń któryś.');
+  const dir = join(SHOT_DIR, String(req.ws.id));
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, `${Date.now()}-${newToken(6)}.${ext}`);
+  writeFileSync(path, buf);
+  const id = db.prepare('INSERT INTO channel_shots(workspace_id,channel_id,caption,path) VALUES(?,?,?,?)').run(req.ws.id, ch.id, s(req.query.caption, 200), path).lastInsertRowid;
+  ok(res, { shot: { id, caption: s(req.query.caption, 200) } });
+}));
+app.put('/api/shots/:id', wrap((req, res) => {
+  const x = shotOf(req);
+  db.prepare('UPDATE channel_shots SET caption=? WHERE id=?').run(s(req.body?.caption, 200), x.id);
+  ok(res);
+}));
+app.delete('/api/shots/:id', wrap((req, res) => {
+  const x = shotOf(req);
+  rmSync(x.path, { force: true });
+  db.prepare('DELETE FROM channel_shots WHERE id=?').run(x.id);
+  ok(res);
+}));
+app.get('/api/shots/:id/img', wrap((req, res) => {
+  const x = shotOf(req);
+  if (!existsSync(x.path)) throw httpErr(404, 'Brak pliku zrzutu.');
+  res.set('Cache-Control', 'private, max-age=300').sendFile(x.path);
 }));
 app.delete('/api/channels/:id', wrap((req, res) => {
   const n = db.prepare('SELECT COUNT(*) c FROM channels WHERE workspace_id=?').get(req.ws.id).c;
@@ -374,6 +417,65 @@ app.put('/api/videos/:id/stats', wrap((req, res) => {
   ok(res, { video: getVideo(req.ws.id, v.id) });
 }));
 
+// ---- TikTok Studio export: every post with its retention curve; a film's stats come from its most viewed post
+function refreshPostStats(ws, videoId) {
+  const best = db.prepare('SELECT * FROM tiktok_posts WHERE workspace_id=? AND video_id=? ORDER BY views DESC LIMIT 1').get(ws.id, videoId);
+  if (!best) return;
+  const d = JSON.parse(best.data || '{}');
+  writeStats(videoId, { ...d, retention_curve: (d.retention || []).join(','), posted: 1, publish_date: (best.posted_at || '').slice(0, 10) }, ws.timezone);
+  db.prepare("UPDATE videos SET url=? WHERE id=? AND url=''").run(best.url, videoId);
+}
+const postRow = (p, titles) => {
+  const d = JSON.parse(p.data || '{}');
+  return { tiktok_id: p.tiktok_id, video_id: p.video_id, video_title: titles.get(p.video_id) || '', how: p.match_how, caption: p.caption, posted_at: p.posted_at,
+    duration: p.duration, views: p.views, url: p.url, completion: d.completion ?? null, avg_watch: d.avg_watch ?? null, r3: d.retention?.[3] ?? null };
+};
+function listPosts(wsId) {
+  const titles = new Map(db.prepare('SELECT id, title FROM videos WHERE workspace_id=?').all(wsId).map(v => [v.id, v.title]));
+  return db.prepare('SELECT * FROM tiktok_posts WHERE workspace_id=? ORDER BY posted_at DESC').all(wsId).map(p => postRow(p, titles));
+}
+
+app.post('/api/stats/tiktok-import', wrap((req, res) => {
+  const text = String(req.body?.csv || '');
+  if (!isTiktokExport(text)) throw httpErr(400, 'To nie wygląda na eksport z TikTok Studio (brak kolumn "Video ID" i "Audience retention"). Pobierz go w TikTok Studio: Analityka, Treści, Eksportuj.');
+  const posts = tiktokExportPosts(text);
+  if (!posts.length) throw httpErr(400, 'Plik nie ma żadnego filmu.');
+  const chId = req.body?.channel_id ? channelId(req.ws.id, req.body.channel_id) : null;
+  const videos = db.prepare('SELECT id, channel_id, title, ref, caption, url, duration_sec, created_at FROM videos WHERE workspace_id=?').all(req.ws.id);
+  const touched = new Set();
+  db.transaction(() => {
+    for (const p of posts) {
+      const prev = db.prepare('SELECT video_id, match_how FROM tiktok_posts WHERE workspace_id=? AND tiktok_id=?').get(req.ws.id, p.tiktok_id);
+      // a link the user set by hand wins over any guess
+      const m = prev?.match_how === 'ręcznie' ? { video: { id: prev.video_id }, how: 'ręcznie' } : matchPost(p, videos, chId);
+      const { tiktok_id, url, caption, posted_at, duration, views, ...rest } = p;
+      db.prepare(`INSERT INTO tiktok_posts(workspace_id,tiktok_id,video_id,match_how,url,caption,posted_at,duration,views,data,imported_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(workspace_id,tiktok_id) DO UPDATE SET video_id=excluded.video_id, match_how=excluded.match_how, url=excluded.url, caption=excluded.caption,
+        posted_at=excluded.posted_at, duration=excluded.duration, views=excluded.views, data=excluded.data, imported_at=excluded.imported_at`)
+        .run(req.ws.id, tiktok_id, m?.video.id ?? null, m?.how || '', url, caption.slice(0, 2200), posted_at, duration, views, JSON.stringify({ views, ...rest }), nowIso());
+      if (m?.video.id) touched.add(m.video.id);
+    }
+    for (const id of touched) refreshPostStats(req.ws, id);
+  })();
+  const ids = new Set(posts.map(p => p.tiktok_id));
+  const rows = listPosts(req.ws.id).filter(p => ids.has(p.tiktok_id));
+  ok(res, { posts: rows, matched: rows.filter(p => p.video_id).length, films: touched.size });
+}));
+
+app.get('/api/stats/tiktok-posts', wrap((req, res) => ok(res, { posts: listPosts(req.ws.id) })));
+
+/** Link a post to a film by hand (or unlink with video_id null); the film's stats follow its best post. */
+app.put('/api/stats/tiktok-posts/:tid', wrap((req, res) => {
+  const p = db.prepare('SELECT * FROM tiktok_posts WHERE workspace_id=? AND tiktok_id=?').get(req.ws.id, String(req.params.tid));
+  if (!p) throw httpErr(404, 'Nie ma takiego posta. Zaimportuj eksport jeszcze raz.');
+  const vid = req.body?.video_id ? int(req.body.video_id) : null;
+  if (vid && !db.prepare('SELECT id FROM videos WHERE id=? AND workspace_id=?').get(vid, req.ws.id)) throw httpErr(404, 'Film nie istnieje.');
+  db.prepare("UPDATE tiktok_posts SET video_id=?, match_how=? WHERE workspace_id=? AND tiktok_id=?").run(vid, vid ? 'ręcznie' : '', req.ws.id, p.tiktok_id);
+  if (vid) refreshPostStats(req.ws, vid);
+  if (p.video_id && p.video_id !== vid) refreshPostStats(req.ws, p.video_id);
+  ok(res, { posts: listPosts(req.ws.id) });
+}));
+
 app.delete('/api/videos/:id', wrap((req, res) => {
   const v = db.prepare('SELECT id, media_path FROM videos WHERE id=? AND workspace_id=?').get(int(req.params.id), req.ws.id);
   if (!v) throw httpErr(404, 'Film nie istnieje.');
@@ -389,18 +491,28 @@ function mediaOf(req) {
   return v;
 }
 app.get('/api/videos/:id/media', wrap((req, res) => { const v = mediaOf(req); res.type('video/mp4'); res.sendFile(v.media_path); }));
+// list thumbnail: one frame from the film, cached next to it and rebuilt when the film file changes
+app.get('/api/videos/:id/thumb', wrap((req, res) => {
+  const v = mediaOf(req);
+  const thumb = v.media_path.replace(/\.mp4$/i, '') + '.thumb.jpg';
+  if (!existsSync(thumb) || statSync(thumb).mtimeMs < statSync(v.media_path).mtimeMs) {
+    const r = spawnSync('ffmpeg', ['-loglevel', 'error', '-y', '-ss', '0.6', '-i', v.media_path, '-frames:v', '1', '-vf', 'scale=270:-2', '-q:v', '4', thumb], { timeout: 30_000 });
+    if (r.status !== 0 || !existsSync(thumb)) throw httpErr(404, 'Nie udało się zrobić miniatury.');
+  }
+  res.set('Cache-Control', 'private, max-age=300').sendFile(thumb);
+}));
 app.get('/api/videos/:id/download', wrap((req, res) => { const v = mediaOf(req); res.download(v.media_path, `${slugify(v.title)}.mp4`); }));
 
 // ---- generator (opencode + DeepSeek) ---------------------------------------------------------
 app.get('/api/generator', (req, res) => ok(res, { generator: { ...generatorStatus(req.query.refresh === '1'), usedToday: usedToday(req.ws), phases: PHASES } }));
 app.post('/api/generate', requireUser, rateLimit('generate', 20, 3600_000), wrap((req, res) => {
   const b = req.body || {};
-  let topic = s(b.topic, 200), hook = s(b.hook, 300), notes = s(b.notes, 2000), queueId = null, chId = null;
+  let topic = s(b.topic, 200), hook = s(b.hook, 300), notes = s(b.notes, 2000), queueId = null, chId = null, qStyle = '', qLen = 0;
   if (b.queue_id) {
     const q = db.prepare('SELECT * FROM queue WHERE id=? AND workspace_id=?').get(int(b.queue_id), req.ws.id);
     if (!q) throw httpErr(404, 'Temat nie istnieje.');
     if (q.video_id) throw httpErr(409, 'Ten temat ma już film.');
-    topic = topic || q.topic; hook = hook || q.hook; notes = notes || q.notes; queueId = q.id; chId = q.channel_id;
+    topic = topic || q.topic; hook = hook || q.hook; notes = notes || q.notes; queueId = q.id; chId = q.channel_id; qStyle = q.style || ''; qLen = q.length_sec || 0;
   }
   if (!topic) throw httpErr(400, 'Podaj temat filmu.');
   if (!chId) chId = channelId(req.ws.id, b.channel_id ?? b.channel, { required: true });
@@ -409,20 +521,23 @@ app.post('/api/generate', requireUser, rateLimit('generate', 20, 3600_000), wrap
     queueId = db.prepare("INSERT INTO queue(workspace_id,channel_id,topic,hook,notes,status) VALUES(?,?,?,?,?,'render')")
       .run(req.ws.id, chId, topic, hook, notes).lastInsertRowid;
   }
-  const len = Math.round(Number(b.length_sec));
+  const len = Math.round(Number(b.length_sec) || qLen);   // no length sent = the one planned on the topic
   let attachment;
   if (b.attachment_id) {
     const u = db.prepare('SELECT id, name, path FROM uploads WHERE id=? AND workspace_id=?').get(int(b.attachment_id), req.ws.id);
     if (!u) throw httpErr(400, 'Załącznik nie istnieje. Wgraj PDF ponownie.');
     attachment = { id: u.id, name: u.name, path: u.path };
   }
-  const opts = { attachment, format: ['short', 'long_vertical', 'long_wide'].includes(b.format) ? b.format : 'short', length_sec: Number.isFinite(len) && len >= 20 && len <= 600 ? len : undefined,
+  let format = ['short', 'long_vertical', 'long_wide'].includes(b.format) ? b.format : 'short';
+  if (format === 'short' && len > 90) format = 'long_vertical';   // a vertical film over 90 s is the long vertical format, not a clipped short
+  const opts = { attachment, format, length_sec: Number.isFinite(len) && len >= 20 && len <= 600 ? len : undefined,
     voice: VOICES.includes(b.voice) ? b.voice : undefined, script: s(b.script, 6000) || undefined };
-  const style = styleList().find(x => x.id === b.style);
+  const style = styleList().find(x => x.id === ('style' in b ? b.style : qStyle));   // no style sent = the one planned on the topic
   if (style?.verticalOnly && opts.format === 'long_wide') throw httpErr(400, `Styl "${style.name}" jest tylko pionowy. Wybierz format pionowy albo inny styl.`);
   opts.style = style ? style.id : undefined;   // brak stylu = agent dobiera sam z katalogu
   opts.broll = b.broll === true || b.broll === 'true' || b.broll === 1;
   opts.research = b.research === true;
+  opts.music = b.music === true;   // music is opt-in: without it the film is voice and sound effects only
   if (Array.isArray(b.biblia_off)) opts.biblia_off = b.biblia_off.filter(id => BIBLIA_IDS.includes(id));   // TikTok Bible elements switched off
   if (Array.isArray(b.subskills)) {
     const own = new Set(db.prepare('SELECT id FROM subskills WHERE workspace_id=? AND enabled=1').all(req.ws.id).map(r => r.id));
@@ -510,6 +625,33 @@ app.get('/api/inspire/:id/frame/:name', wrap((req, res) => {
 }));
 
 // ---- subskills: the user's own add-ons for the generator brief -------------------------------------
+// ---- generator agents: every account can rewrite the brief of each agent; empty = the kit default ----
+const agentRow = (wsId, a) => {
+  const own = db.prepare('SELECT updated_at FROM agent_prompts WHERE workspace_id=? AND agent=?').get(wsId, a.id);
+  return { ...a, custom: Boolean(own), updated_at: own?.updated_at || null, body: agentTemplate(wsId, a.id), placeholders: [...new Set(agentDefault(a.id).match(/\{\{\w+\}\}/g) || [])] };
+};
+app.get('/api/agents', (req, res) => ok(res, { agents: AGENTS.map(a => agentRow(req.ws.id, a)) }));
+app.get('/api/agents/:id/default', wrap((req, res) => {
+  if (!AGENTS.some(a => a.id === req.params.id)) throw httpErr(404, 'Nie ma takiego agenta.');
+  ok(res, { body: agentDefault(req.params.id) });
+}));
+app.put('/api/agents/:id', requireUser, wrap((req, res) => {
+  const a = AGENTS.find(x => x.id === req.params.id);
+  if (!a) throw httpErr(404, 'Nie ma takiego agenta.');
+  const body = String(req.body?.body ?? '').replace(/\r\n/g, '\n');
+  if (body.trim().length < 200) throw httpErr(400, 'Prompt jest za krótki (min. 200 znaków). Żeby wrócić do domyślnego, użyj "Przywróć domyślny".');
+  if (body.length > 60000) throw httpErr(400, 'Prompt jest za długi (max 60 000 znaków).');
+  db.prepare(`INSERT INTO agent_prompts(workspace_id, agent, body, updated_at) VALUES(?,?,?,?)
+    ON CONFLICT(workspace_id, agent) DO UPDATE SET body=excluded.body, updated_at=excluded.updated_at`).run(req.ws.id, a.id, body, nowIso());
+  ok(res, { agent: agentRow(req.ws.id, a) });
+}));
+app.delete('/api/agents/:id', requireUser, wrap((req, res) => {
+  const a = AGENTS.find(x => x.id === req.params.id);
+  if (!a) throw httpErr(404, 'Nie ma takiego agenta.');
+  db.prepare('DELETE FROM agent_prompts WHERE workspace_id=? AND agent=?').run(req.ws.id, a.id);
+  ok(res, { agent: agentRow(req.ws.id, a) });
+}));
+
 app.get('/api/subskills', (req, res) => ok(res, { subskills: db.prepare('SELECT * FROM subskills WHERE workspace_id=? ORDER BY id').all(req.ws.id) }));
 app.post('/api/subskills', wrap((req, res) => {
   const b = req.body || {};
@@ -549,6 +691,23 @@ app.get('/api/jobs/:id', wrap((req, res) => {
   const j = jobForWorkspace(req.ws.id, int(req.params.id));
   if (!j) throw httpErr(404, 'Zadanie nie istnieje.');
   ok(res, { job: j });
+}));
+// frames the agent looked at (contact sheets, snapshots), shown inline in the job log
+app.get('/api/jobs/:id/frame', wrap((req, res) => {
+  const j = jobForWorkspace(req.ws.id, int(req.params.id));
+  if (!j) throw httpErr(404, 'Zadanie nie istnieje.');
+  const base = resolve(GEN_DIR, String(req.ws.id), `job-${j.id}`);
+  const file = resolve(base, String(req.query.f || ''));
+  if (!file.startsWith(base + '/') || !/\.(jpe?g|png|webp)$/i.test(file) || !existsSync(file)) throw httpErr(404, 'Nie ma takiej klatki.');
+  res.set('Cache-Control', 'private, max-age=60').sendFile(file);
+}));
+app.post('/api/jobs/:id/resume', requireUser, wrap((req, res) => {
+  if (!resumeJob(req.ws.id, int(req.params.id))) throw httpErr(409, 'Tego zadania nie da się wznowić (brak zapisanej pracy agenta).');
+  ok(res);
+}));
+app.post('/api/jobs/:id/retry', requireUser, wrap((req, res) => {
+  if (!retryJob(req.ws.id, int(req.params.id))) throw httpErr(409, 'Tego zadania nie da się uruchomić ponownie (już działa albo jest gotowe).');
+  ok(res);
 }));
 app.post('/api/jobs/:id/cancel', requireUser, wrap((req, res) => {
   if (!cancelJob(req.ws.id, int(req.params.id))) throw httpErr(409, 'Tego zadania nie da się już zatrzymać.');
@@ -631,9 +790,11 @@ app.put('/api/queue/:id', wrap((req, res) => {
   const b = req.body || {};
   if ('status' in b && !QSTATUS.includes(b.status)) throw httpErr(400, 'Nieznany etap.');
   if ('topic' in b && !s(b.topic)) throw httpErr(400, 'Temat nie może być pusty.');
-  db.prepare('UPDATE queue SET topic=?, hook=?, notes=?, status=?, priority=?, updated_at=? WHERE id=?').run(
+  if ('style' in b && b.style && !styleList().some(x => x.id === b.style)) throw httpErr(400, 'Nieznany styl wizualny.');
+  db.prepare('UPDATE queue SET topic=?, hook=?, notes=?, status=?, priority=?, style=?, length_sec=?, updated_at=? WHERE id=?').run(
     'topic' in b ? s(b.topic, 200) : row.topic, 'hook' in b ? s(b.hook, 300) : row.hook, 'notes' in b ? s(b.notes, 2000) : row.notes,
-    b.status || row.status, 'priority' in b ? Math.min(3, Math.max(1, int(b.priority, 2))) : row.priority, nowIso(), row.id);
+    b.status || row.status, 'priority' in b ? Math.min(3, Math.max(1, int(b.priority, 2))) : row.priority, 'style' in b ? s(b.style, 60) : (row.style || ''),
+    'length_sec' in b ? Math.min(600, Math.max(0, int(b.length_sec))) : (row.length_sec || 0), nowIso(), row.id);
   ok(res);
 }));
 app.delete('/api/queue/:id', wrap((req, res) => {
@@ -766,6 +927,7 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`mailer: ${mailerReady ? 'Brevo' : 'DRY (brak BREVO_SMTP_*)'} | AI: ${aiReady() ? DEFAULT_MODEL : 'wyłączone (brak OPENROUTER_API_KEY)'}`);
     startScheduler();
     recoverJobs();
+    startLimitWatcher();
     const g = generatorStatus();
     console.log(`generator: ${g.ready ? `gotowy (${g.model})` : `niedostępny (brak: ${g.missing.join(', ')})`}`);
   });

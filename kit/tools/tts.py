@@ -1,4 +1,7 @@
-"""Gemini TTS przez OpenRouter: każdy akapit osobno, PCM 24 kHz, sklejone z krótką przerwą."""
+"""Gemini TTS przez OpenRouter: każdy akapit osobno, PCM 24 kHz, sklejone z krótką przerwą.
+  python3 tts.py tts.txt raw.wav GŁOS ["instrukcja stylu lektora"]
+Instrukcja stylu idzie osobnym polem (nie jest czytana na głos), np. "pewny siebie prowadzący TikToka, szybko, z uśmiechem".
+W tts.txt wolno używać znaczników Gemini w nawiasach kwadratowych, np. [short pause], [excited]; nie są czytane."""
 import json, os, re, sys, time, urllib.request, urllib.error, wave
 from concurrent.futures import ThreadPoolExecutor
 
@@ -10,7 +13,9 @@ KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
 if not KEY: sys.exit("TTS niedostępny: brak OPENROUTER_API_KEY w środowisku")
 
 def speak(text, voice, tries=3):
-    body = json.dumps({"model": MODEL, "input": text, "voice": voice, "response_format": "pcm"}).encode()
+    req_body = {"model": MODEL, "input": text, "voice": voice, "response_format": "pcm"}
+    if STYLE: req_body["instructions"] = STYLE
+    body = json.dumps(req_body).encode()
     last = None
     for i in range(tries):
         req = urllib.request.Request(URL, data=body, headers={"Authorization": "Bearer " + KEY, "Content-Type": "application/json"})
@@ -28,6 +33,7 @@ def speak(text, voice, tries=3):
     raise RuntimeError(last)
 
 src, out, voice = sys.argv[1], sys.argv[2], sys.argv[3]
+STYLE = (sys.argv[4] if len(sys.argv) > 4 else os.environ.get("TTS_STYLE", "")).strip()[:500]
 paras = [p.strip() for p in re.split(r"\n\s*\n", open(src, encoding="utf-8").read()) if p.strip()]
 with ThreadPoolExecutor(5) as ex:
     pcms = list(ex.map(lambda p: speak(p, voice), paras))

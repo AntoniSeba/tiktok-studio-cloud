@@ -69,7 +69,7 @@ def ocr(obraz):
         p = f.name
     try:
         out = subprocess.run(["tesseract", p, "stdout", "--psm", "11", "-l", "eng", "tsv"],
-                             capture_output=True, text=True,
+                             capture_output=True, text=True, encoding="utf-8", errors="replace",
                              env={**os.environ, "OMP_THREAD_LIMIT": "1"}).stdout
     finally:
         os.remove(p)
