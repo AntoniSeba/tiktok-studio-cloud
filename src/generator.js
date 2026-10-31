@@ -885,6 +885,10 @@ function spawnAgent(job, dir, lib, resumeSid, stage = 'motion') {
   child.on('close', (code) => {
     clearTimeout(timer);
     running.delete(job.id);
+    // the container wrote as root: hand the job folder and the cutout library back to the Studio's user
+    if (SANDBOX === 'docker' && process.getuid) {
+      spawnSync('docker', ['run', '--rm', '-v', `${dir}:${dir}`, '-v', `${lib}:${lib}`, SANDBOX_IMAGE, 'chown', '-R', `${process.getuid()}:${process.getgid()}`, dir, lib], { stdio: 'ignore', timeout: 120_000 });
+    }
     if ((code !== 0 || resultError) && parkOnLimit(job.id, stage, `${lastText}\n${errTail}`)) return setImmediate(pump);
     try { afterStage(job.id, stage, code, lastText, errTail); } catch (e) {
       setJob(job.id, { status: 'error', error: String(e.message || e).slice(0, 500), finished_at: nowIso() });
@@ -953,7 +957,10 @@ function finish(id, code, lastText, errTail) {
   log(id, `Gotowe: "${title}", ${p.duration} s, koszt modelu ok. ${job.cost_usd.toFixed(3)} USD`);
   // keep the sources for a while (debugging, re-render), drop heavy temporary files now
   // copies of the 3D models and the isolated render copy are rebuilt from the skill when needed
-  for (const junk of ['project/node_modules', 'project/renders', 'node_modules', 'raw.wav', 'cut.wav', 'project/model', 'work/render']) rmSync(join(dir, junk), { recursive: true, force: true });
+  // a file that cannot be removed (e.g. still owned by another user) never turns a finished film into an error
+  for (const junk of ['project/node_modules', 'project/renders', 'node_modules', 'raw.wav', 'cut.wav', 'project/model', 'work/render']) {
+    try { rmSync(join(dir, junk), { recursive: true, force: true }); } catch (e) { log(id, `Sprzątanie: nie usunąłem ${junk} (${e.code || e.message})`); }
+  }
 }
 
 // ---- usage limit: park the job and wake it up by itself -----------------------------------------
