@@ -51,8 +51,20 @@ print(f"klatek: {len(fr)} ({fps:g} kl/s)")
 print(f"mignięcia: {len(flashes)}" + (" w " + ", ".join(t(i) for i in flashes[:12]) if flashes else "") + " (cel 0)")
 print(f"zacinanie: {len(stutters)} klatek stoi w trakcie ruchu ({ratio:.0%}, cel <= 4%)" + (", np. " + ", ".join(t(i) for i in stutters[:6]) if stutters else ""))
 print(f"skoki całego kadru: {len(jumps)}" + (" w " + ", ".join(t(i) for i in jumps[:12]) if jumps else "") + " (w ciągłym ujęciu hooka cel 0)")
-ok = not flashes and ratio <= 0.04
+# NIEPOKÓJ: ile razy na sekundę kadr wyraźnie szarpie i jak dużo klatek jest spokojnych.
+# Dobre filmy kanałów (silniki z B-rollem, Wykłady Razem): 0,3 do 2,6 szarpnięcia/s i 80 do 93% spokojnych klatek.
+# Film z frazami wlatującymi i wylatującymi co pół sekundy miał 4,3/s i 68%: widz dostaje oczopląsu.
+secs = len(fr) / fps
+jerks = sum(1 for x in d if x > 8) / secs
+calm = sum(1 for x in d if x < 3) / len(d)
+calm_ok = jerks <= 3.0 and calm >= 0.78
+print(f"niepokój: {jerks:.2f} szarpnięcia/s (cel <= 3,0), spokojne klatki {calm:.0%} (cel >= 78%)")
+ok = not flashes and ratio <= 0.04 and calm_ok
+if not calm_ok:
+    print("FAIL: film jest nerwowy (oczopląs). Napis zostaje na ekranie co najmniej 1,2 s i zmienia się na całe zdanie albo frazę, nie co 2 słowa; "
+          "jedno miękkie wejście, wyjście samym zanikiem lub czystym cięciem (bez wylatywania w górę i rozsypywania liter); "
+          "bez pełnoekranowych zmian koloru tła poza cięciem sceny; kamera i tło stoją albo jadą jednym wolnym ruchem. Popraw i wyrenderuj raz jeszcze.")
 print("PASS" if ok else "FAIL: film miga albo się zacina. Najczęstsze przyczyny: ciężkie filtry CSS (kilka drop-shadow, blur, brightness) animowane co klatkę, "
       "stan zależny od poprzedniej klatki zamiast czystej funkcji czasu, elementy ładowane leniwie, mało miejsca na dysku przy renderze. "
-      "Uprość filtry (cień jako osobny statyczny element), licz wszystko z t, wyrenderuj ponownie i sprawdź jeszcze raz.")
+      "Uprość filtry (cień jako osobny statyczny element), licz wszystko z t, wyrenderuj ponownie i sprawdź jeszcze raz." if calm_ok else "FAIL")
 sys.exit(0 if ok else 1)
