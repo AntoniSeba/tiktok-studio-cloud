@@ -807,6 +807,8 @@ function spawnAgent(job, dir, lib, resumeSid, stage = 'motion') {
     rest = ['run', '--rm', '--name', `tsc-job-${job.id}`, '--memory', process.env.GEN_DOCKER_MEMORY || '2g', '--cpus', process.env.GEN_DOCKER_CPUS || '3',
       '--pids-limit', '512', '--security-opt', 'no-new-privileges',
       '-v', `${dir}:${dir}`, '-v', `${KIT}:${KIT}:ro`, '-v', `${lib}:${lib}`, '-w', dir,
+      // the container runs as root; Claude Code allows --dangerously-skip-permissions there only inside a declared sandbox
+      '-e', 'IS_SANDBOX=1',
       ...pass.flatMap(k => ['-e', k]), SANDBOX_IMAGE, engine === 'claude' ? 'claude' : 'opencode', ...args];
     cmd = 'docker';
     spawnEnv = { PATH: process.env.PATH, HOME: process.env.HOME, ...Object.fromEntries(pass.map(k => [k, env[k]])) };
