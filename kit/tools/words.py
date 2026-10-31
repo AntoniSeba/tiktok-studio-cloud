@@ -39,8 +39,11 @@ except Exception as e:
 if not W:
     try:
         from faster_whisper import WhisperModel
+        import numpy as np
         m = WhisperModel("base", device="cpu", compute_type="int8")
-        segs, _ = m.transcribe(src, language="pl", word_timestamps=True, beam_size=5)
+        # decode with ffmpeg ourselves: faster-whisper's own decoder (PyAV) breaks on PyAV 15+ ("metadata_errors")
+        pcm = subprocess.run([bin_("ffmpeg") or "ffmpeg", "-v", "error", "-i", src, "-f", "s16le", "-ac", "1", "-ar", "16000", "-"], check=True, capture_output=True).stdout
+        segs, _ = m.transcribe(np.frombuffer(pcm, np.int16).astype(np.float32) / 32768.0, language="pl", word_timestamps=True, beam_size=5)
         W = [{"w": w.word.strip(), "s": round(w.start, 3), "e": round(w.end, 3)} for s in segs for w in s.words]
     except ImportError:
         import whisper
